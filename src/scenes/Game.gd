@@ -26,7 +26,6 @@ var _pending_powerup_refill_type: String = ""
 const ICON_UNDO := "↶"
 const ICON_PRISM := "◈"
 const ICON_SHUFFLE := "⤮"
-const ICON_FILM := "🎬"
 const ICON_LOADING := "…"
 
 func _ready() -> void:
@@ -262,28 +261,44 @@ func _request_powerup_refill(powerup_type: String) -> void:
 func _powerup_button_icon(base_icon: String, charges: int, powerup_type: String) -> String:
 	if _pending_powerup_refill_type == powerup_type:
 		return ICON_LOADING
-	if charges > 0:
-		return base_icon
-	if _is_rewarded_ready():
-		return ICON_FILM
 	return base_icon
 
 func _update_badge(label: Label, charges: int, is_loading: bool) -> void:
 	if label == null:
 		return
-	label.visible = charges > 0
-	label.text = "..." if is_loading else "x%d" % charges
-	label.modulate = Color(0.98, 0.99, 1.0, 0.98) if charges > 0 else Color(0.78, 0.86, 1.0, 0.94)
+	label.visible = true
+	if is_loading:
+		label.text = "Loading..."
+		label.modulate = Color(0.78, 0.86, 1.0, 0.94)
+		_set_badge_centered(label)
+	elif charges > 0:
+		label.text = "x%d" % charges
+		label.modulate = Color(0.98, 0.99, 1.0, 0.98)
+		_set_badge_top_center(label)
+	else:
+		label.text = "Watch Ad"
+		label.modulate = Color(0.78, 0.9, 1.0, 0.98)
+		_set_badge_top_center(label)
 
-func _is_rewarded_ready() -> bool:
-	if AdManager == null:
-		return false
-	var provider: Variant = AdManager.provider
-	if provider == null:
-		return false
-	if provider.has_method("is_rewarded_ready"):
-		return bool(provider.call("is_rewarded_ready"))
-	return false
+func _set_badge_top_center(label: Label) -> void:
+	label.anchor_left = 0.0
+	label.anchor_top = 0.0
+	label.anchor_right = 1.0
+	label.anchor_bottom = 0.0
+	label.offset_left = 8.0
+	label.offset_top = 8.0
+	label.offset_right = -8.0
+	label.offset_bottom = 40.0
+
+func _set_badge_centered(label: Label) -> void:
+	label.anchor_left = 0.0
+	label.anchor_top = 0.0
+	label.anchor_right = 1.0
+	label.anchor_bottom = 1.0
+	label.offset_left = 8.0
+	label.offset_top = 0.0
+	label.offset_right = -8.0
+	label.offset_bottom = 0.0
 
 func _is_other_refill_pending(powerup_type: String) -> bool:
 	return not _pending_powerup_refill_type.is_empty() and _pending_powerup_refill_type != powerup_type

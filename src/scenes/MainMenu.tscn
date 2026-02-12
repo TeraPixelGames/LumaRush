@@ -49,6 +49,7 @@ horizontal_alignment = 1
 theme_override_font_sizes/font_size = 78
 
 [node name="Subtitle" type="Label" parent="UI/VBox"]
+visible = false
 text = "Tap to light the board"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 32
