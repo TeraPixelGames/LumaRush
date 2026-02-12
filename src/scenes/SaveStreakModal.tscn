@@ -1,0 +1,53 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://src/scenes/SaveStreakModal.gd" id=1]
+[ext_resource type="Script" path="res://src/ui/GlassPanel.gd" id=2]
+[ext_resource type="Theme" path="res://src/ui/UiTheme.tres" id=3]
+
+[node name="SaveStreakModal" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource( 1 )
+theme = ExtResource( 3 )
+
+[node name="Dim" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.4)
+
+[node name="Panel" type="ColorRect" parent="."]
+script = ExtResource( 2 )
+anchor_left = 0.15
+anchor_top = 0.32
+anchor_right = 0.85
+anchor_bottom = 0.68
+color = Color(0.05, 0.08, 0.14, 0.56)
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+anchor_left = 0.1
+anchor_top = 0.1
+anchor_right = 0.9
+anchor_bottom = 0.9
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="Panel/VBox"]
+text = "Save Your Streak"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 46
+
+[node name="Status" type="Label" parent="Panel/VBox"]
+text = "Watch a short ad to save"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+
+[node name="SaveButton" type="Button" parent="Panel/VBox"]
+text = "Watch Ad"
+custom_minimum_size = Vector2(0, 98)
+
+[node name="Close" type="Button" parent="Panel/VBox"]
+text = "Not Now"
+custom_minimum_size = Vector2(0, 98)
+
+[connection signal="pressed" from="Panel/VBox/SaveButton" to="." method="_on_save_pressed"]
+[connection signal="pressed" from="Panel/VBox/Close" to="." method="_on_close_pressed"]

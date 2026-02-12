@@ -1,0 +1,65 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://src/scenes/Results.gd" id=1]
+[ext_resource type="PackedScene" path="res://src/visual/BackgroundController.tscn" id=2]
+[ext_resource type="Script" path="res://src/ui/GlassPanel.gd" id=3]
+[ext_resource type="Theme" path="res://src/ui/UiTheme.tres" id=4]
+
+[node name="Results" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource( 1 )
+theme = ExtResource( 4 )
+
+[node name="BackgroundController" parent="." instance=ExtResource( 2 )]
+
+[node name="UI" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="ColorRect" parent="UI"]
+script = ExtResource( 3 )
+anchor_left = 0.1
+anchor_top = 0.25
+anchor_right = 0.9
+anchor_bottom = 0.75
+color = Color(0.05, 0.08, 0.14, 0.52)
+
+[node name="VBox" type="VBoxContainer" parent="UI"]
+anchor_left = 0.2
+anchor_top = 0.3
+anchor_right = 0.8
+anchor_bottom = 0.7
+alignment = 1
+theme_override_constants/separation = 18
+
+[node name="Title" type="Label" parent="UI/VBox"]
+text = "Results"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 60
+
+[node name="Score" type="Label" parent="UI/VBox"]
+text = "Score: 0"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 34
+
+[node name="Best" type="Label" parent="UI/VBox"]
+text = "Best: 0"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 30
+
+[node name="Streak" type="Label" parent="UI/VBox"]
+text = "Streak: 0"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 30
+
+[node name="PlayAgain" type="Button" parent="UI/VBox"]
+text = "Play Again"
+custom_minimum_size = Vector2(0, 104)
+
+[node name="Menu" type="Button" parent="UI/VBox"]
+text = "Main Menu"
+custom_minimum_size = Vector2(0, 104)
+
+[connection signal="pressed" from="UI/VBox/PlayAgain" to="." method="_on_play_again_pressed"]
+[connection signal="pressed" from="UI/VBox/Menu" to="." method="_on_menu_pressed"]

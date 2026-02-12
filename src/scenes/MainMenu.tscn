@@ -1,0 +1,61 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://src/scenes/MainMenu.gd" id=1]
+[ext_resource type="PackedScene" path="res://src/visual/BackgroundController.tscn" id=2]
+[ext_resource type="Script" path="res://src/ui/GlassPanel.gd" id=3]
+[ext_resource type="Theme" path="res://src/ui/UiTheme.tres" id=4]
+
+[node name="MainMenu" type="Control"]
+theme = ExtResource( 4 )
+script = ExtResource( 1 )
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="BackgroundController" parent="." instance=ExtResource( 2 )]
+
+[node name="UI" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="ColorRect" parent="UI"]
+script = ExtResource( 3 )
+anchor_left = 0.1
+anchor_top = 0.22
+anchor_right = 0.9
+anchor_bottom = 0.78
+color = Color(0.05, 0.08, 0.14, 0.52)
+
+[node name="VBox" type="VBoxContainer" parent="UI"]
+anchor_left = 0.2
+anchor_top = 0.27
+anchor_right = 0.8
+anchor_bottom = 0.73
+alignment = 1
+theme_override_constants/separation = 22
+
+[node name="Title" type="Label" parent="UI/VBox"]
+text = "LumaRush"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 72
+
+[node name="Subtitle" type="Label" parent="UI/VBox"]
+text = "Tap to light the board"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 30
+
+[node name="TrackLabel" type="Label" parent="UI/VBox"]
+text = "Track"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+
+[node name="TrackOption" type="OptionButton" parent="UI/VBox"]
+size_flags_horizontal = 4
+custom_minimum_size = Vector2(0, 96)
+
+[node name="Start" type="Button" parent="UI/VBox"]
+text = "Start"
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 110)
+
+[connection signal="item_selected" from="UI/VBox/TrackOption" to="." method="_on_track_option_item_selected"]
+[connection signal="pressed" from="UI/VBox/Start" to="." method="_on_start_pressed"]
