@@ -10,6 +10,7 @@ var _t := 0.0
 var _mood_tween: Tween
 var _star_tween: Tween
 var _pulse_tween: Tween
+var _emission_tween: Tween
 
 var _calm_a := Color(0.96, 0.98, 1.0, 1.0)
 var _calm_b := Color(0.82, 0.88, 1.0, 1.0)
@@ -25,6 +26,12 @@ var _star_brightness: float = 0.4
 var _match_density_mul: float = 1.0
 var _match_speed_mul: float = 1.0
 var _match_brightness_mul: float = 1.0
+var _emission_activity: float = 1.0
+var _current_calm_weight: float = 1.0
+var _base_point_color: Color = Color(1, 1, 1, 1)
+var _base_streak_color: Color = Color(1, 1, 1, 1)
+var _boost_point_color: Color = Color(1, 1, 1, 1)
+var _boost_streak_color: Color = Color(1, 1, 1, 1)
 
 func _ready() -> void:
 	var mat := ShaderMaterial.new()
@@ -58,6 +65,11 @@ func _ready() -> void:
 	streak_particles.emitting = true
 	_boost_particles.emitting = false
 	_boost_streak_particles.emitting = false
+	_base_point_color = FeatureFlags.starfield_base_point_color()
+	_base_streak_color = FeatureFlags.starfield_base_streak_color()
+	_boost_point_color = FeatureFlags.starfield_boost_point_color()
+	_boost_streak_color = FeatureFlags.starfield_boost_streak_color()
+	reset_starfield_emission_taper()
 	set_mood(BackgroundMood.get_mood())
 
 func _process(delta: float) -> void:
@@ -74,10 +86,12 @@ func set_mood(mood: int, fade_seconds: float = 0.8) -> void:
 	var to_a := _calm_a if mood == BackgroundMood.Mood.CALM else _hype_a
 	var to_b := _calm_b if mood == BackgroundMood.Mood.CALM else _hype_b
 	var calm_weight: float = 1.0 if mood == BackgroundMood.Mood.CALM else 0.0
+	_current_calm_weight = calm_weight
 	_apply_mood_targets(to_a, to_b, calm_weight, fade_seconds)
 
 func set_mood_mix(calm_weight: float, fade_seconds: float = 0.8) -> void:
 	var mix_t: float = clamp(calm_weight, 0.0, 1.0)
+	_current_calm_weight = mix_t
 	var to_a: Color = _hype_a.lerp(_calm_a, mix_t)
 	var to_b: Color = _hype_b.lerp(_calm_b, mix_t)
 	_apply_mood_targets(to_a, to_b, mix_t, fade_seconds)
@@ -105,6 +119,8 @@ func set_deterministic(enabled: bool) -> void:
 			_boost_particles.emitting = false
 		if _boost_streak_particles:
 			_boost_streak_particles.emitting = false
+		if is_instance_valid(_emission_tween):
+			_emission_tween.kill()
 
 func pulse_starfield() -> void:
 	if _deterministic:
@@ -119,8 +135,10 @@ func pulse_starfield() -> void:
 	# Mirror match-layer envelope timing: hold, then taper back to base.
 	_pulse_tween.tween_interval(FeatureFlags.combo_decay_delay_seconds())
 	if _boost_particles:
+		_boost_particles.restart()
 		_boost_particles.emitting = true
 	if _boost_streak_particles:
+		_boost_streak_particles.restart()
 		_boost_streak_particles.emitting = true
 	_pulse_tween.set_parallel(true)
 	_pulse_tween.tween_method(func(v: float) -> void:
@@ -139,6 +157,25 @@ func pulse_starfield() -> void:
 		if _boost_streak_particles:
 			_boost_streak_particles.emitting = false
 	)
+
+func reset_starfield_emission_taper(ramp_up_seconds: float = -1.0) -> void:
+	if _deterministic:
+		return
+	if is_instance_valid(_emission_tween):
+		_emission_tween.kill()
+	var ramp_up: float = ramp_up_seconds
+	if ramp_up < 0.0:
+		ramp_up = FeatureFlags.starfield_emission_ramp_up_seconds()
+	ramp_up = max(0.0, ramp_up)
+	var duration: float = max(0.1, FeatureFlags.match_hint_delay_seconds())
+	var hype_weight: float = 1.0 - clamp(_current_calm_weight, 0.0, 1.0)
+	var target_floor: float = FeatureFlags.starfield_hype_emission_floor() * hype_weight
+	_emission_tween = create_tween()
+	if ramp_up > 0.0:
+		_emission_tween.tween_method(Callable(self, "_set_emission_activity"), _emission_activity, 1.0, ramp_up)
+	else:
+		_set_emission_activity(1.0)
+	_emission_tween.tween_method(Callable(self, "_set_emission_activity"), 1.0, target_floor, duration)
 
 func _set_starfield_profile(density: float, speed: float, brightness: float, fade_seconds: float) -> void:
 	_star_density = max(0.1, density)
@@ -185,15 +222,28 @@ func _update_starfield_runtime() -> void:
 	var pulse01: float = (beat_wave + 1.0) * 0.5
 	var beat_brightness_mul: float = 1.0 + (pulse01 * beat_pulse_depth * 0.5)
 	var density_mul: float = 1.0
-	var speed_mul: float = _match_speed_mul * beat_speed_mul
+	var speed_mul: float = beat_speed_mul
 	var brightness_mul: float = _match_brightness_mul * beat_brightness_mul
 
-	particles.amount = int(round(300.0 * _star_density * density_mul))
-	streak_particles.amount = int(round(86.0 * _star_density * density_mul))
+	particles.amount = max(1, int(round(300.0 * _star_density * density_mul)))
+	streak_particles.amount = max(1, int(round(86.0 * _star_density * density_mul)))
+	# Keep base field velocity stable; match speed boost is additive via boost emitters only.
 	particles.speed_scale = _star_speed * speed_mul
 	streak_particles.speed_scale = _star_speed * speed_mul
-	particles.modulate.a = min(1.0, 0.9 * _star_brightness * brightness_mul)
-	streak_particles.modulate.a = min(1.0, 1.0 * _star_brightness * brightness_mul)
+	particles.modulate = Color(
+		_base_point_color.r,
+		_base_point_color.g,
+		_base_point_color.b,
+		min(1.0, 0.9 * _star_brightness * brightness_mul * _emission_activity)
+	)
+	streak_particles.modulate = Color(
+		_base_streak_color.r,
+		_base_streak_color.g,
+		_base_streak_color.b,
+		min(1.0, 1.0 * _star_brightness * brightness_mul * _emission_activity)
+	)
+	particles.emitting = _emission_activity > 0.01
+	streak_particles.emitting = _emission_activity > 0.01
 	_update_boost_emitters()
 
 func _setup_boost_emitters(center: Vector2) -> void:
@@ -201,7 +251,8 @@ func _setup_boost_emitters(center: Vector2) -> void:
 	_boost_particles.name = "BoostParticles"
 	_boost_particles.position = center
 	_boost_particles.local_coords = true
-	_boost_particles.one_shot = false
+	_boost_particles.one_shot = true
+	_boost_particles.explosiveness = 1.0
 	_boost_particles.lifetime = particles.lifetime
 	_boost_particles.preprocess = particles.preprocess
 	_boost_particles.texture = _particle_tex
@@ -212,7 +263,8 @@ func _setup_boost_emitters(center: Vector2) -> void:
 	_boost_streak_particles.name = "BoostStreakParticles"
 	_boost_streak_particles.position = center
 	_boost_streak_particles.local_coords = true
-	_boost_streak_particles.one_shot = false
+	_boost_streak_particles.one_shot = true
+	_boost_streak_particles.explosiveness = 1.0
 	_boost_streak_particles.lifetime = streak_particles.lifetime
 	_boost_streak_particles.preprocess = streak_particles.preprocess
 	_boost_streak_particles.texture = _streak_tex
@@ -227,8 +279,26 @@ func _update_boost_emitters() -> void:
 	_boost_streak_particles.amount = max(1, int(round(70.0 * _star_density * extra_density)))
 	_boost_particles.speed_scale = _star_speed * _match_speed_mul
 	_boost_streak_particles.speed_scale = _star_speed * _match_speed_mul
-	_boost_particles.modulate = Color(1, 1, 1, min(1.0, 0.85 * _star_brightness * _match_brightness_mul))
-	_boost_streak_particles.modulate = Color(1, 1, 1, min(1.0, 1.0 * _star_brightness * _match_brightness_mul))
+	_boost_particles.modulate = Color(
+		_boost_point_color.r,
+		_boost_point_color.g,
+		_boost_point_color.b,
+		min(1.0, 0.85 * _star_brightness * _match_brightness_mul)
+	)
+	_boost_streak_particles.modulate = Color(
+		_boost_streak_color.r,
+		_boost_streak_color.g,
+		_boost_streak_color.b,
+		min(1.0, 1.0 * _star_brightness * _match_brightness_mul)
+	)
+	if _emission_activity <= 0.01:
+		_boost_particles.emitting = false
+		_boost_streak_particles.emitting = false
+
+func _set_emission_activity(v: float) -> void:
+	_emission_activity = clamp(v, 0.0, 1.0)
+	particles.emitting = _emission_activity > 0.01
+	streak_particles.emitting = _emission_activity > 0.01
 
 func _build_soft_particle_texture(size: int, softness: float) -> Texture2D:
 	var image := Image.create(size, size, false, Image.FORMAT_RGBA8)

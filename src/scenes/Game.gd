@@ -21,6 +21,7 @@ var _pending_powerup_refill_type: String = ""
 func _ready() -> void:
 	BackgroundMood.register_controller($BackgroundController)
 	_update_gameplay_mood_from_matches(0.0)
+	BackgroundMood.reset_starfield_emission_taper()
 	MusicManager.set_gameplay()
 	VisualTestMode.apply_if_enabled($BackgroundController, $BackgroundController)
 	board.connect("match_made", Callable(self, "_on_match_made"))
@@ -36,6 +37,12 @@ func _ready() -> void:
 	powerup_flash.visible = false
 	_update_score()
 	_update_powerup_buttons()
+	_center_board()
+	_play_enter_transition()
+
+func _notification(what: int) -> void:
+	if what == Control.NOTIFICATION_RESIZED:
+		_center_board()
 
 func _on_match_made(group: Array) -> void:
 	combo += 1
@@ -43,6 +50,7 @@ func _on_match_made(group: Array) -> void:
 	score += gained
 	_update_score()
 	_update_gameplay_mood_from_matches()
+	BackgroundMood.reset_starfield_emission_taper()
 	BackgroundMood.pulse_starfield()
 	MusicManager.on_match_made()
 	if combo == HIGH_COMBO_THRESHOLD:
@@ -258,3 +266,27 @@ func _play_end_transition() -> void:
 	fade.tween_property($UI, "modulate:a", 0.0, 0.35)
 	fade.tween_property(overlay, "color:a", 0.95, 0.45)
 	await fade.finished
+
+func _play_enter_transition() -> void:
+	board.set_process_input(false)
+	set_process_input(false)
+	var overlay := ColorRect.new()
+	overlay.anchor_right = 1.0
+	overlay.anchor_bottom = 1.0
+	overlay.color = Color(1.0, 1.0, 1.0, 1.0)
+	add_child(overlay)
+	var t := create_tween()
+	t.tween_property(overlay, "color:a", 0.0, 0.35)
+	t.finished.connect(func() -> void:
+		if is_instance_valid(overlay):
+			overlay.queue_free()
+		board.set_process_input(true)
+		set_process_input(true)
+	)
+
+func _center_board() -> void:
+	if board == null:
+		return
+	var view_size: Vector2 = get_viewport_rect().size
+	var board_size: Vector2 = Vector2(board.width * board.tile_size, board.height * board.tile_size)
+	board.position = (view_size - board_size) * 0.5

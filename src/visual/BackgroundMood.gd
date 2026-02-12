@@ -35,3 +35,7 @@ func set_mood_mix(calm_weight: float, fade_seconds: float = -1.0) -> void:
 func pulse_starfield() -> void:
 	if _controller and _controller.has_method("pulse_starfield"):
 		_controller.call("pulse_starfield")
+
+func reset_starfield_emission_taper(ramp_up_seconds: float = -1.0) -> void:
+	if _controller and _controller.has_method("reset_starfield_emission_taper"):
+		_controller.call("reset_starfield_emission_taper", ramp_up_seconds)

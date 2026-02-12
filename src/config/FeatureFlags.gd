@@ -45,6 +45,12 @@ const STARFIELD_MATCH_PULSE_SECONDS := 0.2
 const STARFIELD_MATCH_PULSE_DENSITY_MULT := 1.45
 const STARFIELD_MATCH_PULSE_SPEED_MULT := 1.2
 const STARFIELD_MATCH_PULSE_BRIGHTNESS_MULT := 1.25
+const STARFIELD_HYPE_EMISSION_FLOOR := 0.35
+const STARFIELD_EMISSION_RAMP_UP_SECONDS := 0.14
+const STARFIELD_BASE_POINT_COLOR := Color(1, 1, 1, 1)
+const STARFIELD_BASE_STREAK_COLOR := Color(1, 1, 1, 1)
+const STARFIELD_BOOST_POINT_COLOR := Color(1, 1, 1, 1)
+const STARFIELD_BOOST_STREAK_COLOR := Color(1, 1, 1, 1)
 const HAPTICS_ENABLED := true
 const MATCH_CLICK_HAPTIC_DURATION_MS := 14
 const MATCH_CLICK_HAPTIC_AMPLITUDE := 0.35
@@ -213,6 +219,36 @@ static func starfield_match_pulse_brightness_mult() -> float:
 	if ProjectSettings.has_setting("lumarush/starfield_match_pulse_brightness_mult"):
 		return max(1.0, float(ProjectSettings.get_setting("lumarush/starfield_match_pulse_brightness_mult")))
 	return STARFIELD_MATCH_PULSE_BRIGHTNESS_MULT
+
+static func starfield_hype_emission_floor() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_hype_emission_floor"):
+		return clamp(float(ProjectSettings.get_setting("lumarush/starfield_hype_emission_floor")), 0.0, 1.0)
+	return STARFIELD_HYPE_EMISSION_FLOOR
+
+static func starfield_emission_ramp_up_seconds() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_emission_ramp_up_seconds"):
+		return max(0.0, float(ProjectSettings.get_setting("lumarush/starfield_emission_ramp_up_seconds")))
+	return STARFIELD_EMISSION_RAMP_UP_SECONDS
+
+static func starfield_base_point_color() -> Color:
+	if ProjectSettings.has_setting("lumarush/starfield_base_point_color"):
+		return ProjectSettings.get_setting("lumarush/starfield_base_point_color")
+	return STARFIELD_BASE_POINT_COLOR
+
+static func starfield_base_streak_color() -> Color:
+	if ProjectSettings.has_setting("lumarush/starfield_base_streak_color"):
+		return ProjectSettings.get_setting("lumarush/starfield_base_streak_color")
+	return STARFIELD_BASE_STREAK_COLOR
+
+static func starfield_boost_point_color() -> Color:
+	if ProjectSettings.has_setting("lumarush/starfield_boost_point_color"):
+		return ProjectSettings.get_setting("lumarush/starfield_boost_point_color")
+	return STARFIELD_BOOST_POINT_COLOR
+
+static func starfield_boost_streak_color() -> Color:
+	if ProjectSettings.has_setting("lumarush/starfield_boost_streak_color"):
+		return ProjectSettings.get_setting("lumarush/starfield_boost_streak_color")
+	return STARFIELD_BOOST_STREAK_COLOR
 
 static func haptics_enabled() -> bool:
 	if ProjectSettings.has_setting("lumarush/haptics_enabled"):
