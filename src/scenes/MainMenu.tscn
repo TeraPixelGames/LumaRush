@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://src/scenes/MainMenu.gd" id=1]
 [ext_resource type="PackedScene" path="res://src/visual/BackgroundController.tscn" id=2]
 [ext_resource type="Script" path="res://src/ui/GlassPanel.gd" id=3]
 [ext_resource type="Theme" path="res://src/ui/UiTheme.tres" id=4]
+[ext_resource type="Script" path="res://src/ui/LiquidGlassButton.gd" id=5]
 
 [node name="MainMenu" type="Control"]
 theme = ExtResource( 4 )
@@ -49,10 +50,12 @@ horizontal_alignment = 1
 theme_override_font_sizes/font_size = 28
 
 [node name="TrackOption" type="OptionButton" parent="UI/VBox"]
+script = ExtResource( 5 )
 size_flags_horizontal = 4
 custom_minimum_size = Vector2(0, 96)
 
 [node name="Start" type="Button" parent="UI/VBox"]
+script = ExtResource( 5 )
 text = "Start"
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(0, 110)

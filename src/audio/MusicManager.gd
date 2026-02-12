@@ -29,6 +29,7 @@ var _drums_fade_tween: Tween
 var _mix_fade_tween: Tween
 var _fx_cooldown_until_ms := 0
 var _tracks: Dictionary = {}
+var _track_bpms: Dictionary = {}
 var _current_track_id: String = ""
 var _friendly_names := {
 	"default": "Luma Theme",
@@ -146,7 +147,12 @@ func get_available_tracks() -> Array[Dictionary]:
 func get_current_track_id() -> String:
 	return _current_track_id
 
-func register_track(id: String, synth_stream: AudioStream, bass_stream: AudioStream, drums_stream: AudioStream, fx_stream: AudioStream) -> bool:
+func get_current_track_bpm() -> float:
+	if _track_bpms.has(_current_track_id):
+		return float(_track_bpms[_current_track_id])
+	return float(FeatureFlags.BPM)
+
+func register_track(id: String, synth_stream: AudioStream, bass_stream: AudioStream, drums_stream: AudioStream, fx_stream: AudioStream, bpm: float = FeatureFlags.BPM) -> bool:
 	if id.is_empty():
 		return false
 	if synth_stream == null or bass_stream == null or drums_stream == null or fx_stream == null:
@@ -157,6 +163,7 @@ func register_track(id: String, synth_stream: AudioStream, bass_stream: AudioStr
 		"drums": drums_stream,
 		"fx": fx_stream,
 	}
+	_track_bpms[id] = max(40.0, bpm)
 	return true
 
 func set_track(id: String, restart_if_playing: bool = true) -> bool:
@@ -191,14 +198,16 @@ func _register_builtin_tracks() -> void:
 		DEFAULT_SYNTH,
 		DEFAULT_BASS,
 		DEFAULT_DRUMS,
-		DEFAULT_FX
+		DEFAULT_FX,
+		95.0
 	)
 	register_track(
 		"glassgrid",
 		GLASSGRID_SYNTH,
 		GLASSGRID_BASS,
 		GLASSGRID_DRUMS,
-		GLASSGRID_FX
+		GLASSGRID_FX,
+		95.0
 	)
 
 func _ensure_player(node_name: String) -> AudioStreamPlayer:
@@ -264,6 +273,7 @@ func _register_track_entry(entry: Dictionary) -> void:
 	var bass_path: String = str(entry.get("bass", ""))
 	var drums_path: String = str(entry.get("drums", ""))
 	var fx_path: String = str(entry.get("fx", ""))
+	var bpm: float = float(entry.get("bpm", FeatureFlags.BPM))
 	if id.is_empty() or synth_path.is_empty() or bass_path.is_empty() or drums_path.is_empty() or fx_path.is_empty():
 		return
 	if not FileAccess.file_exists(synth_path):
@@ -279,5 +289,6 @@ func _register_track_entry(entry: Dictionary) -> void:
 		load(synth_path) as AudioStream,
 		load(bass_path) as AudioStream,
 		load(drums_path) as AudioStream,
-		load(fx_path) as AudioStream
+		load(fx_path) as AudioStream,
+		bpm
 	)

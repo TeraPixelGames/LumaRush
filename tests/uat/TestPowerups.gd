@@ -6,6 +6,7 @@ func before() -> void:
 	ProjectSettings.set_setting("lumarush/powerup_shuffle_charges", 1)
 	ProjectSettings.set_setting("lumarush/visual_test_mode", true)
 	ProjectSettings.set_setting("lumarush/audio_test_mode", true)
+	ProjectSettings.set_setting("lumarush/use_mock_ads", true)
 
 func test_remove_color_and_undo_restore_board() -> void:
 	var game: Control = await _spawn_game()
@@ -34,6 +35,20 @@ func test_shuffle_consumes_charge() -> void:
 	await game._on_shuffle_pressed()
 	var shuffle_button: Button = game.get_node("UI/Powerups/Shuffle") as Button
 	assert_that(shuffle_button.text).contains("x0")
+	game.queue_free()
+	await get_tree().process_frame
+
+func test_depleted_button_reward_grants_that_powerup() -> void:
+	ProjectSettings.set_setting("lumarush/powerup_undo_charges", 0)
+	ProjectSettings.set_setting("lumarush/powerup_remove_color_charges", 0)
+	ProjectSettings.set_setting("lumarush/powerup_shuffle_charges", 0)
+	var game: Control = await _spawn_game()
+	var undo_button: Button = game.get_node("UI/Powerups/Undo") as Button
+	assert_that(undo_button.text).contains("Watch Ad")
+	game._on_undo_pressed()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_that(undo_button.text).contains("x1")
 	game.queue_free()
 	await get_tree().process_frame
 

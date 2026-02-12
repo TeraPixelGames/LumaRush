@@ -31,3 +31,7 @@ func set_mood_mix(calm_weight: float, fade_seconds: float = -1.0) -> void:
 			_controller.call("set_mood_mix", clamped, fade_seconds)
 		else:
 			_controller.call("set_mood_mix", clamped)
+
+func pulse_starfield() -> void:
+	if _controller and _controller.has_method("pulse_starfield"):
+		_controller.call("pulse_starfield")

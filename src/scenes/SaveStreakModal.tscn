@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://src/scenes/SaveStreakModal.gd" id=1]
 [ext_resource type="Script" path="res://src/ui/GlassPanel.gd" id=2]
 [ext_resource type="Theme" path="res://src/ui/UiTheme.tres" id=3]
+[ext_resource type="Script" path="res://src/ui/LiquidGlassButton.gd" id=4]
 
 [node name="SaveStreakModal" type="Control"]
 anchor_right = 1.0
@@ -42,10 +43,12 @@ horizontal_alignment = 1
 theme_override_font_sizes/font_size = 28
 
 [node name="SaveButton" type="Button" parent="Panel/VBox"]
+script = ExtResource( 4 )
 text = "Watch Ad"
 custom_minimum_size = Vector2(0, 98)
 
 [node name="Close" type="Button" parent="Panel/VBox"]
+script = ExtResource( 4 )
 text = "Not Now"
 custom_minimum_size = Vector2(0, 98)
 

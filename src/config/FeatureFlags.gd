@@ -26,13 +26,25 @@ const GAMEPLAY_CALM_FADE_SECONDS := 6.0
 const MATCH_HINT_DELAY_SECONDS := 3.0
 const GAMEPLAY_MATCHES_NORMALIZER := 12.0
 const GAMEPLAY_MATCHES_MOOD_FADE_SECONDS := 0.6
-const GAMEPLAY_MATCHES_MAX_CALM_WEIGHT := 0.3
+const GAMEPLAY_MATCHES_MAX_CALM_WEIGHT := 0.45
 const HINT_PULSE_SPEED_MULTIPLIER := 0.45
 const AUDIO_TRACK_ID := "glassgrid"
 const AUDIO_TRACK_MANIFEST_PATH := "res://src/audio/tracks.json"
 const CLEAR_HIGH_SCORE_ON_BOOT := false
 const AD_RETRY_ATTEMPTS := 2
 const AD_RETRY_INTERVAL_SECONDS := 0.35
+const AD_PRELOAD_POLL_SECONDS := 1.25
+const STARFIELD_CALM_DENSITY := 1.4
+const STARFIELD_HYPE_DENSITY := 2.8
+const STARFIELD_CALM_SPEED := 1.0
+const STARFIELD_HYPE_SPEED := 2.0
+const STARFIELD_CALM_BRIGHTNESS := 0.8
+const STARFIELD_HYPE_BRIGHTNESS := 1.35
+const STARFIELD_BEAT_PULSE_DEPTH := 0.2
+const STARFIELD_MATCH_PULSE_SECONDS := 0.2
+const STARFIELD_MATCH_PULSE_DENSITY_MULT := 1.45
+const STARFIELD_MATCH_PULSE_SPEED_MULT := 1.2
+const STARFIELD_MATCH_PULSE_BRIGHTNESS_MULT := 1.25
 const HAPTICS_ENABLED := true
 const MATCH_CLICK_HAPTIC_DURATION_MS := 14
 const MATCH_CLICK_HAPTIC_AMPLITUDE := 0.35
@@ -141,6 +153,66 @@ static func ad_retry_interval_seconds() -> float:
 	if ProjectSettings.has_setting("lumarush/ad_retry_interval_seconds"):
 		return max(0.05, float(ProjectSettings.get_setting("lumarush/ad_retry_interval_seconds")))
 	return AD_RETRY_INTERVAL_SECONDS
+
+static func ad_preload_poll_seconds() -> float:
+	if ProjectSettings.has_setting("lumarush/ad_preload_poll_seconds"):
+		return max(0.2, float(ProjectSettings.get_setting("lumarush/ad_preload_poll_seconds")))
+	return AD_PRELOAD_POLL_SECONDS
+
+static func starfield_calm_density() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_calm_density"):
+		return max(0.2, float(ProjectSettings.get_setting("lumarush/starfield_calm_density")))
+	return STARFIELD_CALM_DENSITY
+
+static func starfield_hype_density() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_hype_density"):
+		return max(0.2, float(ProjectSettings.get_setting("lumarush/starfield_hype_density")))
+	return STARFIELD_HYPE_DENSITY
+
+static func starfield_calm_speed() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_calm_speed"):
+		return max(0.1, float(ProjectSettings.get_setting("lumarush/starfield_calm_speed")))
+	return STARFIELD_CALM_SPEED
+
+static func starfield_hype_speed() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_hype_speed"):
+		return max(0.1, float(ProjectSettings.get_setting("lumarush/starfield_hype_speed")))
+	return STARFIELD_HYPE_SPEED
+
+static func starfield_calm_brightness() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_calm_brightness"):
+		return max(0.1, float(ProjectSettings.get_setting("lumarush/starfield_calm_brightness")))
+	return STARFIELD_CALM_BRIGHTNESS
+
+static func starfield_hype_brightness() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_hype_brightness"):
+		return max(0.1, float(ProjectSettings.get_setting("lumarush/starfield_hype_brightness")))
+	return STARFIELD_HYPE_BRIGHTNESS
+
+static func starfield_beat_pulse_depth() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_beat_pulse_depth"):
+		return clamp(float(ProjectSettings.get_setting("lumarush/starfield_beat_pulse_depth")), 0.0, 1.0)
+	return STARFIELD_BEAT_PULSE_DEPTH
+
+static func starfield_match_pulse_seconds() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_match_pulse_seconds"):
+		return max(0.05, float(ProjectSettings.get_setting("lumarush/starfield_match_pulse_seconds")))
+	return STARFIELD_MATCH_PULSE_SECONDS
+
+static func starfield_match_pulse_density_mult() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_match_pulse_density_mult"):
+		return max(1.0, float(ProjectSettings.get_setting("lumarush/starfield_match_pulse_density_mult")))
+	return STARFIELD_MATCH_PULSE_DENSITY_MULT
+
+static func starfield_match_pulse_speed_mult() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_match_pulse_speed_mult"):
+		return max(1.0, float(ProjectSettings.get_setting("lumarush/starfield_match_pulse_speed_mult")))
+	return STARFIELD_MATCH_PULSE_SPEED_MULT
+
+static func starfield_match_pulse_brightness_mult() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_match_pulse_brightness_mult"):
+		return max(1.0, float(ProjectSettings.get_setting("lumarush/starfield_match_pulse_brightness_mult")))
+	return STARFIELD_MATCH_PULSE_BRIGHTNESS_MULT
 
 static func haptics_enabled() -> bool:
 	if ProjectSettings.has_setting("lumarush/haptics_enabled"):

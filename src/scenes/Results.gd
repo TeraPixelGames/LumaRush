@@ -8,7 +8,7 @@ func _ready() -> void:
 	BackgroundMood.register_controller($BackgroundController)
 	BackgroundMood.set_mood(BackgroundMood.Mood.CALM)
 	MusicManager.fade_to_calm(0.6)
-	VisualTestMode.apply_if_enabled($BackgroundController, $BackgroundController/Particles)
+	VisualTestMode.apply_if_enabled($BackgroundController, $BackgroundController)
 	_update_labels()
 	_play_intro()
 	if StreakManager.is_streak_at_risk():

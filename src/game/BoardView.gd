@@ -75,19 +75,12 @@ func _handle_click(pos: Vector2) -> void:
 	_animating = false
 
 func _cell_from_screen_pos(screen_pos: Vector2) -> Vector2i:
-	var canvas_pos: Vector2 = screen_pos
-	var viewport: Viewport = get_viewport()
-	if viewport:
-		canvas_pos = viewport.get_canvas_transform().affine_inverse() * screen_pos
-	var local_canvas: Vector2 = to_local(canvas_pos)
-	var local_direct: Vector2 = to_local(screen_pos)
-	var x_canvas: int = int(floor(local_canvas.x / tile_size))
-	var y_canvas: int = int(floor(local_canvas.y / tile_size))
-	if x_canvas >= 0 and x_canvas < width and y_canvas >= 0 and y_canvas < height:
-		return Vector2i(x_canvas, y_canvas)
-	var x_direct: int = int(floor(local_direct.x / tile_size))
-	var y_direct: int = int(floor(local_direct.y / tile_size))
-	return Vector2i(x_direct, y_direct)
+	# Convert viewport/screen point to this CanvasItem's local coordinates using
+	# the full canvas transform chain (robust across stretch, DPI, and safe-area).
+	var local: Vector2 = make_canvas_position_local(screen_pos)
+	var x: int = int(floor(local.x / tile_size))
+	var y: int = int(floor(local.y / tile_size))
+	return Vector2i(x, y)
 
 func capture_snapshot() -> Array:
 	return board.snapshot()

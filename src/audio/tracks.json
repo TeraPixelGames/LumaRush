@@ -1,6 +1,7 @@
 [
   {
     "id": "default",
+    "bpm": 95,
     "synth": "res://assets/stems/default/background_layer.ogg",
     "bass": "res://assets/stems/default/hype_layer.ogg",
     "drums": "res://assets/stems/default/match_layer.ogg",
@@ -8,6 +9,7 @@
   },
   {
     "id": "glassgrid",
+    "bpm": 95,
     "synth": "res://assets/stems/glassgrid/background_layer.ogg",
     "bass": "res://assets/stems/glassgrid/hype_layer.ogg",
     "drums": "res://assets/stems/glassgrid/match_layer.ogg",

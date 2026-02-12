@@ -1,6 +1,7 @@
 extends Node
 
 const EXPLOSION_SCENE := preload("res://src/vfx/PixelExplosion.tscn")
+var _burst_texture: Texture2D
 
 func play_pixel_explosion(group: Array, tile_size: float, board_origin: Vector2, colors: Array) -> void:
 	if group.is_empty():
@@ -28,6 +29,8 @@ func play_pixel_explosion(group: Array, tile_size: float, board_origin: Vector2,
 	var tex := ImageTexture.create_from_image(img)
 	var explosion: Node2D = EXPLOSION_SCENE.instantiate()
 	var parent := get_tree().current_scene
+	if parent != null and parent.has_node("MidVFX"):
+		parent = parent.get_node("MidVFX")
 	if parent == null:
 		if get_tree() and get_tree().root:
 			parent = get_tree().root
@@ -37,6 +40,8 @@ func play_pixel_explosion(group: Array, tile_size: float, board_origin: Vector2,
 	var pos := board_origin + Vector2(min_x * tile_size, min_y * tile_size)
 	explosion.position = pos
 	explosion.call("setup", tex, 6.0, float(randi() % 1000))
+	var burst_center: Vector2 = board_origin + Vector2((min_x + max_x + 1) * tile_size * 0.5, (min_y + max_y + 1) * tile_size * 0.5)
+	_spawn_pop_burst(parent, burst_center, _color_from_index(int(colors[first.y][first.x])))
 
 func _color_from_index(idx: int) -> Color:
 	var palette := [
@@ -47,3 +52,54 @@ func _color_from_index(idx: int) -> Color:
 		Color(0.9, 0.6, 0.6, 0.9),
 	]
 	return palette[idx % palette.size()]
+
+func _spawn_pop_burst(parent: Node, at: Vector2, tint: Color) -> void:
+	var burst := GPUParticles2D.new()
+	if _burst_texture == null:
+		_burst_texture = _build_burst_texture()
+	burst.texture = _burst_texture
+	burst.local_coords = false
+	burst.top_level = true
+	burst.one_shot = true
+	burst.emitting = false
+	burst.amount = 180
+	burst.lifetime = 1.6
+	burst.explosiveness = 1.0
+	burst.global_position = at
+	burst.modulate = Color(tint.r, tint.g, tint.b, 0.9)
+	burst.z_index = 5
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_POINT
+	pm.direction = Vector3(1.0, 0.0, 0.0)
+	pm.spread = 180.0
+	pm.gravity = Vector3.ZERO
+	pm.initial_velocity_min = 980.0
+	pm.initial_velocity_max = 1480.0
+	pm.linear_accel_min = 40.0
+	pm.linear_accel_max = 80.0
+	pm.angle_min = 0.0
+	pm.angle_max = 360.0
+	pm.scale_min = 0.06
+	pm.scale_max = 0.16
+	pm.radial_accel_min = 0.0
+	pm.radial_accel_max = 0.0
+	pm.color = Color(1, 1, 1, 1)
+	burst.process_material = pm
+	parent.add_child(burst)
+	burst.emitting = true
+	await get_tree().create_timer(1.9).timeout
+	if is_instance_valid(burst):
+		burst.queue_free()
+
+func _build_burst_texture() -> Texture2D:
+	var size: int = 16
+	var image := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var center := Vector2(size * 0.5, size * 0.5)
+	var radius: float = size * 0.5
+	for y in range(size):
+		for x in range(size):
+			var d: float = center.distance_to(Vector2(x, y)) / radius
+			var a: float = clamp(1.0 - d, 0.0, 1.0)
+			a = pow(a, 1.4)
+			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, a))
+	return ImageTexture.create_from_image(image)

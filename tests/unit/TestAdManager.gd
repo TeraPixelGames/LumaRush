@@ -37,7 +37,7 @@ class FakeProvider:
 class TestAdManagerNode:
 	extends "res://src/ads/AdManager.gd"
 
-	func _initialize_provider() -> void:
+	func _initialize_provider_async() -> void:
 		pass
 
 
@@ -74,5 +74,44 @@ func test_rewarded_retries_load_and_show() -> void:
 	await get_tree().create_timer(0.18).timeout
 	assert_that(provider.rewarded_load_calls).is_greater_equal(2)
 	assert_that(provider.rewarded_show_calls).is_greater_equal(1)
+	manager.queue_free()
+	provider.queue_free()
+
+func test_rewarded_powerup_emits_powerup_signal() -> void:
+	var manager := TestAdManagerNode.new()
+	var provider := FakeProvider.new()
+	provider.rewarded_ready_after_loads = 1
+	get_tree().root.add_child(manager)
+	manager.provider = provider
+	get_tree().root.add_child(provider)
+	var powerup_earned: bool = false
+	var save_earned: bool = false
+	manager.connect("rewarded_powerup_earned", func() -> void:
+		powerup_earned = true
+	)
+	manager.connect("rewarded_earned", func() -> void:
+		save_earned = true
+	)
+	assert_that(manager.show_rewarded_for_powerup()).is_true()
+	manager._on_rewarded_earned()
+	assert_that(powerup_earned).is_true()
+	assert_that(save_earned).is_false()
+	manager.queue_free()
+	provider.queue_free()
+
+func test_rewarded_retry_exhausted_emits_closed() -> void:
+	var manager := TestAdManagerNode.new()
+	var provider := FakeProvider.new()
+	provider.rewarded_ready_after_loads = 99
+	get_tree().root.add_child(manager)
+	manager.provider = provider
+	get_tree().root.add_child(provider)
+	var closed_count: int = 0
+	manager.connect("rewarded_closed", func() -> void:
+		closed_count += 1
+	)
+	assert_that(manager.show_rewarded_for_powerup()).is_true()
+	await get_tree().create_timer(0.18).timeout
+	assert_that(closed_count).is_equal(1)
 	manager.queue_free()
 	provider.queue_free()
