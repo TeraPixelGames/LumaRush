@@ -1,0 +1,101 @@
+extends Node
+
+const REFERENCE_HEIGHT: float = 2532.0
+const PRIMARY_TEXT: Color = Color8(242, 244, 255, 255)
+const SECONDARY_TEXT: Color = Color8(242, 244, 255, 166)
+const SHADOW_TEXT: Color = Color(0.02, 0.04, 0.12, 0.82)
+
+const SIZE_SCORE: float = 60.0
+const SIZE_BUTTON: float = 30.0
+const SIZE_MODAL_TITLE: float = 56.0
+const SIZE_BODY: float = 30.0
+const SIZE_MENU_TITLE: float = 64.0
+
+const WEIGHT_REGULAR: int = 400
+const WEIGHT_MEDIUM: int = 500
+const WEIGHT_SEMIBOLD: int = 600
+const WEIGHT_BOLD: int = 700
+
+var _inter_base: FontFile = preload("res://assets/fonts/SpaceGrotesk.ttf")
+var _font_cache: Dictionary = {}
+
+func scale_factor() -> float:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return 1.0
+	var h: float = tree.root.get_visible_rect().size.y
+	if h <= 0.0:
+		return 1.0
+	return clamp(h / REFERENCE_HEIGHT, 0.75, 1.35)
+
+func px(reference_size: float) -> int:
+	return int(round(reference_size * scale_factor()))
+
+func _font_for_weight(weight: int) -> Font:
+	if _font_cache.has(weight):
+		return _font_cache[weight]
+	var variation := FontVariation.new()
+	variation.base_font = _inter_base
+	variation.variation_opentype = {"wght": weight}
+	_font_cache[weight] = variation
+	return variation
+
+func style_label(label: Label, reference_size: float, weight: int, secondary: bool = false) -> void:
+	if label == null:
+		return
+	label.add_theme_font_override("font", _font_for_weight(weight))
+	label.add_theme_font_size_override("font_size", px(reference_size))
+	label.add_theme_color_override("font_color", SECONDARY_TEXT if secondary else PRIMARY_TEXT)
+	label.add_theme_color_override("font_outline_color", SHADOW_TEXT)
+	label.add_theme_constant_override("outline_size", max(1, int(round(2.0 * scale_factor()))))
+
+func style_button(button: BaseButton, reference_size: float, weight: int = WEIGHT_SEMIBOLD) -> void:
+	if button == null:
+		return
+	button.add_theme_font_override("font", _font_for_weight(weight))
+	button.add_theme_font_size_override("font_size", px(reference_size))
+	button.add_theme_color_override("font_color", PRIMARY_TEXT)
+	button.add_theme_color_override("font_hover_color", PRIMARY_TEXT)
+	button.add_theme_color_override("font_pressed_color", PRIMARY_TEXT)
+	button.add_theme_color_override("font_disabled_color", SECONDARY_TEXT)
+	button.add_theme_color_override("font_outline_color", SHADOW_TEXT)
+	button.add_theme_constant_override("outline_size", max(1, int(round(2.0 * scale_factor()))))
+
+func style_main_menu(scene: Control) -> void:
+	style_label(scene.get_node_or_null("UI/VBox/Title"), SIZE_MENU_TITLE, WEIGHT_BOLD)
+	style_label(scene.get_node_or_null("UI/VBox/Subtitle"), SIZE_BODY, WEIGHT_REGULAR, true)
+	style_label(scene.get_node_or_null("UI/VBox/TrackLabel"), SIZE_BODY, WEIGHT_MEDIUM, true)
+	style_button(scene.get_node_or_null("UI/VBox/TrackCarousel/TrackPrev"), 34.0, WEIGHT_BOLD)
+	style_label(scene.get_node_or_null("UI/VBox/TrackCarousel/TrackNameHost/TrackName"), 30.0, WEIGHT_SEMIBOLD)
+	style_button(scene.get_node_or_null("UI/VBox/TrackCarousel/TrackNext"), 34.0, WEIGHT_BOLD)
+	style_button(scene.get_node_or_null("UI/VBox/Start"), SIZE_BUTTON, WEIGHT_SEMIBOLD)
+
+func style_game(scene: Control) -> void:
+	style_label(scene.get_node_or_null("UI/TopBar/ScoreBox/ScoreCaption"), 20.0, WEIGHT_MEDIUM, true)
+	style_label(scene.get_node_or_null("UI/TopBar/ScoreBox/ScoreValue"), 60.0, WEIGHT_SEMIBOLD)
+	style_button(scene.get_node_or_null("UI/TopBar/Pause"), 24.0, WEIGHT_BOLD)
+	style_button(scene.get_node_or_null("UI/Powerups/Undo"), 56.0, WEIGHT_SEMIBOLD)
+	style_button(scene.get_node_or_null("UI/Powerups/RemoveColor"), 56.0, WEIGHT_SEMIBOLD)
+	style_button(scene.get_node_or_null("UI/Powerups/Shuffle"), 56.0, WEIGHT_SEMIBOLD)
+	style_label(scene.get_node_or_null("UI/Powerups/Undo/Badge"), 28.0, WEIGHT_SEMIBOLD)
+	style_label(scene.get_node_or_null("UI/Powerups/RemoveColor/Badge"), 28.0, WEIGHT_SEMIBOLD)
+	style_label(scene.get_node_or_null("UI/Powerups/Shuffle/Badge"), 28.0, WEIGHT_SEMIBOLD)
+
+func style_results(scene: Control) -> void:
+	style_label(scene.get_node_or_null("UI/VBox/Title"), 54.0, WEIGHT_BOLD)
+	style_label(scene.get_node_or_null("UI/VBox/Score"), 84.0, WEIGHT_BOLD)
+	style_label(scene.get_node_or_null("UI/VBox/Best"), 32.0, WEIGHT_MEDIUM, true)
+	style_label(scene.get_node_or_null("UI/VBox/Streak"), 32.0, WEIGHT_MEDIUM, true)
+	style_button(scene.get_node_or_null("UI/VBox/PlayAgain"), 34.0, WEIGHT_BOLD)
+	style_button(scene.get_node_or_null("UI/VBox/Menu"), 30.0, WEIGHT_SEMIBOLD)
+
+func style_pause_overlay(scene: Control) -> void:
+	style_label(scene.get_node_or_null("VBox/Title"), SIZE_MODAL_TITLE, WEIGHT_BOLD)
+	style_button(scene.get_node_or_null("VBox/Resume"), SIZE_BUTTON, WEIGHT_SEMIBOLD)
+	style_button(scene.get_node_or_null("VBox/Quit"), SIZE_BUTTON, WEIGHT_SEMIBOLD)
+
+func style_save_streak(scene: Control) -> void:
+	style_label(scene.get_node_or_null("Panel/VBox/Title"), 56.0, WEIGHT_BOLD)
+	style_label(scene.get_node_or_null("Panel/VBox/Status"), 30.0, WEIGHT_REGULAR, true)
+	style_button(scene.get_node_or_null("Panel/VBox/SaveButton"), SIZE_BUTTON, WEIGHT_SEMIBOLD)
+	style_button(scene.get_node_or_null("Panel/VBox/Close"), SIZE_BUTTON, WEIGHT_MEDIUM)

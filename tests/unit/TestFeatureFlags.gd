@@ -2,6 +2,7 @@ extends GdUnitTestSuite
 
 func before() -> void:
 	ProjectSettings.set_setting("lumarush/tile_blur_mode", FeatureFlags.TileBlurMode.LITE)
+	ProjectSettings.set_setting("lumarush/tile_design_mode", FeatureFlags.TileDesignMode.MODERN)
 	ProjectSettings.set_setting("lumarush/min_match_size", FeatureFlags.MIN_MATCH_SIZE)
 	ProjectSettings.set_setting("lumarush/combo_decay_delay_seconds", FeatureFlags.COMBO_DECAY_DELAY_SECONDS)
 	ProjectSettings.set_setting("lumarush/combo_decay_seconds", FeatureFlags.COMBO_DECAY_SECONDS)
@@ -16,6 +17,10 @@ func before() -> void:
 	ProjectSettings.set_setting("lumarush/clear_high_score_on_boot", FeatureFlags.CLEAR_HIGH_SCORE_ON_BOOT)
 	ProjectSettings.set_setting("lumarush/ad_retry_attempts", FeatureFlags.AD_RETRY_ATTEMPTS)
 	ProjectSettings.set_setting("lumarush/ad_retry_interval_seconds", FeatureFlags.AD_RETRY_INTERVAL_SECONDS)
+	ProjectSettings.set_setting("lumarush/starfield_calm_point_color", FeatureFlags.STARFIELD_CALM_POINT_COLOR)
+	ProjectSettings.set_setting("lumarush/starfield_calm_streak_color", FeatureFlags.STARFIELD_CALM_STREAK_COLOR)
+	ProjectSettings.set_setting("lumarush/starfield_hype_point_color", FeatureFlags.STARFIELD_HYPE_POINT_COLOR)
+	ProjectSettings.set_setting("lumarush/starfield_hype_streak_color", FeatureFlags.STARFIELD_HYPE_STREAK_COLOR)
 	ProjectSettings.set_setting("lumarush/haptics_enabled", FeatureFlags.HAPTICS_ENABLED)
 	ProjectSettings.set_setting("lumarush/match_click_haptic_duration_ms", FeatureFlags.MATCH_CLICK_HAPTIC_DURATION_MS)
 	ProjectSettings.set_setting("lumarush/match_click_haptic_amplitude", FeatureFlags.MATCH_CLICK_HAPTIC_AMPLITUDE)
@@ -33,6 +38,13 @@ func test_tile_blur_mode_default_lite() -> void:
 func test_tile_blur_mode_override_heavy() -> void:
 	ProjectSettings.set_setting("lumarush/tile_blur_mode", FeatureFlags.TileBlurMode.HEAVY)
 	assert_that(FeatureFlags.tile_blur_mode()).is_equal(FeatureFlags.TileBlurMode.HEAVY)
+
+func test_tile_design_mode_default_and_override() -> void:
+	assert_that(FeatureFlags.tile_design_mode()).is_equal(FeatureFlags.TileDesignMode.MODERN)
+	ProjectSettings.set_setting("lumarush/tile_design_mode", FeatureFlags.TileDesignMode.LEGACY)
+	assert_that(FeatureFlags.tile_design_mode()).is_equal(FeatureFlags.TileDesignMode.LEGACY)
+	ProjectSettings.set_setting("lumarush/tile_design_mode", 999)
+	assert_that(FeatureFlags.tile_design_mode()).is_equal(FeatureFlags.TileDesignMode.LEGACY)
 
 func test_min_match_size_default_and_override() -> void:
 	assert_that(FeatureFlags.min_match_size()).is_equal(FeatureFlags.MIN_MATCH_SIZE)
@@ -133,3 +145,11 @@ func test_ad_retry_flags_override() -> void:
 	ProjectSettings.set_setting("lumarush/ad_retry_interval_seconds", 0.0)
 	assert_that(FeatureFlags.ad_retry_attempts()).is_equal(0)
 	assert_that(FeatureFlags.ad_retry_interval_seconds()).is_equal(0.05)
+
+func test_starfield_mode_color_overrides() -> void:
+	assert_that(FeatureFlags.starfield_calm_point_color()).is_equal(FeatureFlags.STARFIELD_CALM_POINT_COLOR)
+	assert_that(FeatureFlags.starfield_hype_point_color()).is_equal(FeatureFlags.STARFIELD_HYPE_POINT_COLOR)
+	ProjectSettings.set_setting("lumarush/starfield_calm_point_color", Color(0.2, 0.8, 1.0, 1.0))
+	ProjectSettings.set_setting("lumarush/starfield_hype_point_color", Color(1.0, 1.0, 1.0, 1.0))
+	assert_that(FeatureFlags.starfield_calm_point_color()).is_equal(Color(0.2, 0.8, 1.0, 1.0))
+	assert_that(FeatureFlags.starfield_hype_point_color()).is_equal(Color(1.0, 1.0, 1.0, 1.0))

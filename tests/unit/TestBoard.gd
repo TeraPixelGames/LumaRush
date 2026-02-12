@@ -90,3 +90,39 @@ func test_remove_color_refills_and_preserves_moves() -> void:
 		for x in range(b.width):
 			assert_that(b.grid[y][x]).is_not_null()
 	assert_that(b.has_move()).is_true()
+
+func test_remove_color_with_palette_bucket_removes_all_visual_matches() -> void:
+	var b := Board.new(4, 3, 8, 99, 3)
+	b.grid = [
+		[0, 5, 1, 6],
+		[2, 7, 3, 4],
+		[5, 0, 6, 1],
+	]
+	var removed: int = b.remove_color(0, 5)
+	assert_that(removed).is_equal(4)
+	for y in range(b.height):
+		for x in range(b.width):
+			assert_that(b.grid[y][x]).is_not_null()
+
+func test_find_group_uses_palette_bucket_when_match_mod_set() -> void:
+	var b := Board.new(3, 3, 8, 7, 2, 5)
+	b.grid = [
+		[0, 5, 1],
+		[5, 0, 2],
+		[3, 4, 6],
+	]
+	var g: Array = b.find_group(Vector2i(0, 0))
+	assert_that(g.size()).is_equal(4)
+
+func test_resolve_move_clears_palette_bucket_matches() -> void:
+	var b := Board.new(3, 3, 8, 7, 3, 5)
+	b.grid = [
+		[0, 5, 1],
+		[5, 0, 2],
+		[3, 4, 6],
+	]
+	var cleared: Array = b.resolve_move(Vector2i(0, 0))
+	assert_that(cleared.size()).is_equal(4)
+	for y in range(b.height):
+		for x in range(b.width):
+			assert_that(b.grid[y][x]).is_not_null()

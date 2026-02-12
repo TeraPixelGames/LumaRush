@@ -20,45 +20,77 @@ anchor_bottom = 1.0
 
 [node name="Panel" type="ColorRect" parent="UI"]
 script = ExtResource( 3 )
-anchor_left = 0.1
-anchor_top = 0.22
-anchor_right = 0.9
-anchor_bottom = 0.78
-color = Color(0.05, 0.08, 0.14, 0.52)
+anchor_left = 0.12
+anchor_top = 0.2
+anchor_right = 0.88
+anchor_bottom = 0.8
+blur_radius = 5.2
+tint = Color(0.12, 0.18, 0.32, 0.22)
+edge = Color(0.9, 0.96, 1, 0.2)
+corner_radius = 0.11
+edge_width = 1.1
+warp_intensity = 0.12
+strength_x = 8.0
+strength_y = 8.0
+chromatic_strength = 0.18
+color = Color(0.12, 0.18, 0.32, 0.22)
 
 [node name="VBox" type="VBoxContainer" parent="UI"]
-anchor_left = 0.2
-anchor_top = 0.27
-anchor_right = 0.8
-anchor_bottom = 0.73
+anchor_left = 0.15
+anchor_top = 0.21
+anchor_right = 0.85
+anchor_bottom = 0.79
 alignment = 1
-theme_override_constants/separation = 22
+theme_override_constants/separation = 24
 
 [node name="Title" type="Label" parent="UI/VBox"]
 text = "LumaRush"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 72
+theme_override_font_sizes/font_size = 78
 
 [node name="Subtitle" type="Label" parent="UI/VBox"]
 text = "Tap to light the board"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 32
 
 [node name="TrackLabel" type="Label" parent="UI/VBox"]
 text = "Track"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 28
 
-[node name="TrackOption" type="OptionButton" parent="UI/VBox"]
+[node name="TrackCarousel" type="HBoxContainer" parent="UI/VBox"]
+alignment = 1
+theme_override_constants/separation = 14
+
+[node name="TrackPrev" type="Button" parent="UI/VBox/TrackCarousel"]
 script = ExtResource( 5 )
-size_flags_horizontal = 4
-custom_minimum_size = Vector2(0, 96)
+text = "<"
+custom_minimum_size = Vector2(88, 88)
+corner_radius = 0.5
+
+[node name="TrackNameHost" type="Control" parent="UI/VBox/TrackCarousel"]
+custom_minimum_size = Vector2(340, 88)
+clip_contents = true
+
+[node name="TrackName" type="Label" parent="UI/VBox/TrackCarousel/TrackNameHost"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+text = "Track"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TrackNext" type="Button" parent="UI/VBox/TrackCarousel"]
+script = ExtResource( 5 )
+text = ">"
+custom_minimum_size = Vector2(88, 88)
+corner_radius = 0.5
 
 [node name="Start" type="Button" parent="UI/VBox"]
 script = ExtResource( 5 )
 text = "Start"
 size_flags_horizontal = 3
-custom_minimum_size = Vector2(0, 110)
+custom_minimum_size = Vector2(0, 118)
 
-[connection signal="item_selected" from="UI/VBox/TrackOption" to="." method="_on_track_option_item_selected"]
+[connection signal="pressed" from="UI/VBox/TrackCarousel/TrackPrev" to="." method="_on_track_prev_pressed"]
+[connection signal="pressed" from="UI/VBox/TrackCarousel/TrackNext" to="." method="_on_track_next_pressed"]
 [connection signal="pressed" from="UI/VBox/Start" to="." method="_on_start_pressed"]

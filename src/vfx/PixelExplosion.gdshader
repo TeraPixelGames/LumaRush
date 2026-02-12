@@ -9,8 +9,9 @@ float rand(vec2 co){
 }
 
 void fragment() {
-	vec2 tex_size = vec2(textureSize(TEXTURE, 0));
-	vec2 pixel_uv = floor(UV * tex_size / pixel_size) * pixel_size / tex_size;
+	vec2 tex_size = max(vec2(textureSize(TEXTURE, 0)), vec2(1.0));
+	float safe_pixel = max(pixel_size, 1.0);
+	vec2 pixel_uv = floor(UV * tex_size / safe_pixel) * safe_pixel / tex_size;
 	float r = rand(pixel_uv * tex_size);
 	vec2 raw_dir = vec2(r, fract(r * 7.31)) - vec2(0.5);
 	float len_dir = max(length(raw_dir), 0.0001);

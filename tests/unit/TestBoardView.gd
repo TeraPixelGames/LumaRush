@@ -101,6 +101,31 @@ func test_remove_color_powerup_removes_tiles() -> void:
 	view._refresh_tiles()
 	var result: Dictionary = await view.apply_remove_color_powerup(0)
 	assert_that(int(result.get("removed", 0))).is_equal(3)
+	for y in range(view.height):
+		for x in range(view.width):
+			var tile: ColorRect = view.tiles[y][x] as ColorRect
+			assert_that(tile).is_not_null()
+			assert_that(tile.modulate.a).is_equal(1.0)
+	view.queue_free()
+
+func test_board_view_normalizes_to_palette_and_matches_exact_color() -> void:
+	ProjectSettings.set_setting("lumarush/min_match_size", 3)
+	var view := BoardView.new()
+	view.width = 3
+	view.height = 3
+	view.colors = 8
+	view.tile_size = 16.0
+	get_tree().root.add_child(view)
+	view.board.grid = [
+		[0, 5, 1],
+		[5, 0, 2],
+		[3, 4, 6],
+	]
+	view._normalize_board_color_ids()
+	assert_that(int(view.board.grid[0][1])).is_equal(0)
+	assert_that(int(view.board.grid[1][0])).is_equal(0)
+	var group: Array = view.board.find_group(Vector2i(0, 0))
+	assert_that(group.size()).is_equal(4)
 	view.queue_free()
 
 func test_cell_from_screen_pos_accounts_for_board_position() -> void:
@@ -113,6 +138,18 @@ func test_cell_from_screen_pos_accounts_for_board_position() -> void:
 	var cell: Vector2i = view._cell_from_screen_pos(Vector2(156 + 96 * 2 + 8, 420 + 96 * 3 + 8))
 	assert_that(cell).is_equal(Vector2i(2, 3))
 	view.queue_free()
+
+func test_legacy_tile_design_uses_squarer_shader_profile() -> void:
+	ProjectSettings.set_setting("lumarush/tile_design_mode", FeatureFlags.TileDesignMode.LEGACY)
+	var view := BoardView.new()
+	view.width = 3
+	view.height = 3
+	get_tree().root.add_child(view)
+	var mat: ShaderMaterial = view.tiles[0][0].material as ShaderMaterial
+	assert_that(float(mat.get_shader_parameter("corner_radius"))).is_less_equal(0.07)
+	assert_that(float(mat.get_shader_parameter("border"))).is_less_equal(0.06)
+	view.queue_free()
+	ProjectSettings.set_setting("lumarush/tile_design_mode", FeatureFlags.TileDesignMode.MODERN)
 
 func test_match_haptic_signal_emits_when_enabled() -> void:
 	ProjectSettings.set_setting("lumarush/haptics_enabled", true)

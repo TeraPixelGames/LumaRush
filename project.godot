@@ -24,6 +24,8 @@ MusicManager="*res://src/audio/MusicManager.gd"
 BackgroundMood="*res://src/visual/BackgroundMood.gd"
 VFXManager="*res://src/vfx/VFXManager.gd"
 RunManager="*res://src/core/RunManager.gd"
+SafeArea="*res://src/core/SafeArea.gd"
+Typography="*res://src/ui/Typography.gd"
 
 [debug]
 
@@ -32,8 +34,8 @@ window/handheld/orientation="portrait"
 
 [display]
 
-window/size/viewport_width=1080
-window/size/viewport_height=1920
+window/size/viewport_width=1170
+window/size/viewport_height=2532
 window/size/mode=4
 window/size/resizable=false
 window/size/borderless=true

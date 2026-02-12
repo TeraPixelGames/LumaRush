@@ -28,20 +28,30 @@ func play_pixel_explosion(group: Array, tile_size: float, board_origin: Vector2,
 		img.fill_rect(Rect2i(local_x, local_y, int(tile_size), int(tile_size)), c)
 	var tex := ImageTexture.create_from_image(img)
 	var explosion: Node2D = EXPLOSION_SCENE.instantiate()
-	var parent := get_tree().current_scene
-	if parent != null and parent.has_node("MidVFX"):
-		parent = parent.get_node("MidVFX")
+	var parent := _resolve_vfx_parent()
 	if parent == null:
-		if get_tree() and get_tree().root:
-			parent = get_tree().root
-		else:
-			return
+		return
 	parent.add_child(explosion)
 	var pos := board_origin + Vector2(min_x * tile_size, min_y * tile_size)
 	explosion.position = pos
 	explosion.call("setup", tex, 6.0, float(randi() % 1000))
 	var burst_center: Vector2 = board_origin + Vector2((min_x + max_x + 1) * tile_size * 0.5, (min_y + max_y + 1) * tile_size * 0.5)
 	_spawn_pop_burst(parent, burst_center, _color_from_index(int(colors[first.y][first.x])))
+
+func play_prism_clear(group: Array, tile_size: float, board_origin: Vector2, color_idx: int) -> void:
+	if group.is_empty():
+		return
+	var parent := _resolve_vfx_parent()
+	if parent == null:
+		return
+	var center: Vector2 = Vector2.ZERO
+	for p in group:
+		center += board_origin + Vector2((p.x + 0.5) * tile_size, (p.y + 0.5) * tile_size)
+	center /= float(group.size())
+	var tint: Color = _color_from_index(color_idx)
+	_spawn_pop_burst(parent, center, tint)
+	_spawn_pop_burst(parent, center + Vector2(14, -10), Color(1.0, 1.0, 1.0, 0.9))
+	_spawn_pop_burst(parent, center + Vector2(-12, 10), tint.lightened(0.2))
 
 func _color_from_index(idx: int) -> Color:
 	var palette := [
@@ -90,6 +100,16 @@ func _spawn_pop_burst(parent: Node, at: Vector2, tint: Color) -> void:
 	await get_tree().create_timer(1.9).timeout
 	if is_instance_valid(burst):
 		burst.queue_free()
+
+func _resolve_vfx_parent() -> Node:
+	var parent := get_tree().current_scene
+	if parent != null and parent.has_node("MidVFX"):
+		parent = parent.get_node("MidVFX")
+	if parent != null:
+		return parent
+	if get_tree() and get_tree().root:
+		return get_tree().root
+	return null
 
 func _build_burst_texture() -> Texture2D:
 	var size: int = 16

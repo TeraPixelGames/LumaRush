@@ -1,10 +1,15 @@
 extends Control
 
 @onready var board: BoardView = $BoardView
-@onready var score_label: Label = $UI/TopBar/Score
+@onready var score_value_label: Label = $UI/TopBar/ScoreBox/ScoreValue
 @onready var undo_button: Button = $UI/Powerups/Undo
 @onready var remove_color_button: Button = $UI/Powerups/RemoveColor
 @onready var shuffle_button: Button = $UI/Powerups/Shuffle
+@onready var undo_badge: Label = $UI/Powerups/Undo/Badge
+@onready var prism_badge: Label = $UI/Powerups/RemoveColor/Badge
+@onready var shuffle_badge: Label = $UI/Powerups/Shuffle/Badge
+@onready var board_frame: ColorRect = $UI/BoardFrame
+@onready var board_glow: ColorRect = $UI/BoardGlow
 @onready var powerup_flash: ColorRect = $UI/PowerupFlash
 
 var score := 0
@@ -18,7 +23,23 @@ var _shuffle_charges: int = 0
 var _undo_stack: Array[Dictionary] = []
 var _pending_powerup_refill_type: String = ""
 
+const ICON_UNDO := "↶"
+const ICON_PRISM := "◈"
+const ICON_SHUFFLE := "⤮"
+const ICON_FILM := "🎬"
+const ICON_LOADING := "…"
+
 func _ready() -> void:
+	var stale_overlay: Node = get_node_or_null("RunEndOverlay")
+	if stale_overlay:
+		stale_overlay.queue_free()
+	stale_overlay = get_node_or_null("RunEnterOverlay")
+	if stale_overlay:
+		stale_overlay.queue_free()
+	modulate = Color(1, 1, 1, 1)
+	$BoardView.modulate = Color(1, 1, 1, 1)
+	$UI.modulate = Color(1, 1, 1, 1)
+	Typography.style_game(self)
 	BackgroundMood.register_controller($BackgroundController)
 	_update_gameplay_mood_from_matches(0.0)
 	BackgroundMood.reset_starfield_emission_taper()
@@ -34,6 +55,14 @@ func _ready() -> void:
 	_undo_charges = FeatureFlags.powerup_undo_charges()
 	_remove_color_charges = FeatureFlags.powerup_remove_color_charges()
 	_shuffle_charges = FeatureFlags.powerup_shuffle_charges()
+	if board_frame:
+		board_frame.visible = false
+	if board_glow:
+		board_glow.visible = false
+	for badge in [undo_badge, prism_badge, shuffle_badge]:
+		badge.add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1.0))
+		badge.add_theme_color_override("font_outline_color", Color(0.1, 0.18, 0.36, 0.95))
+		badge.add_theme_constant_override("outline_size", 3)
 	powerup_flash.visible = false
 	_update_score()
 	_update_powerup_buttons()
@@ -42,6 +71,7 @@ func _ready() -> void:
 
 func _notification(what: int) -> void:
 	if what == Control.NOTIFICATION_RESIZED:
+		Typography.style_game(self)
 		_center_board()
 
 func _on_match_made(group: Array) -> void:
@@ -60,7 +90,7 @@ func _on_move_committed(_group: Array, snapshot: Array) -> void:
 	_push_undo(snapshot, score, combo)
 
 func _update_score() -> void:
-	score_label.text = "Score: %d" % score
+	score_value_label.text = "%d" % score
 
 func _on_pause_pressed() -> void:
 	var pause := preload("res://src/scenes/PauseOverlay.tscn").instantiate()
@@ -149,9 +179,12 @@ func _update_gameplay_mood_from_matches(fade_seconds: float = -1.0) -> void:
 	BackgroundMood.set_mood_mix(calm_weight, fade)
 
 func _update_powerup_buttons() -> void:
-	undo_button.text = _powerup_button_text("Undo", _undo_charges, "undo")
-	remove_color_button.text = _powerup_button_text("Prism", _remove_color_charges, "prism")
-	shuffle_button.text = _powerup_button_text("Shuffle", _shuffle_charges, "shuffle")
+	undo_button.text = _powerup_button_icon(ICON_UNDO, _undo_charges, "undo")
+	remove_color_button.text = _powerup_button_icon(ICON_PRISM, _remove_color_charges, "prism")
+	shuffle_button.text = _powerup_button_icon(ICON_SHUFFLE, _shuffle_charges, "shuffle")
+	_update_badge(undo_badge, _undo_charges, _pending_powerup_refill_type == "undo")
+	_update_badge(prism_badge, _remove_color_charges, _pending_powerup_refill_type == "prism")
+	_update_badge(shuffle_badge, _shuffle_charges, _pending_powerup_refill_type == "shuffle")
 	undo_button.disabled = (_undo_charges > 0 and _undo_stack.is_empty()) or _is_other_refill_pending("undo")
 	remove_color_button.disabled = _is_other_refill_pending("prism")
 	shuffle_button.disabled = _is_other_refill_pending("shuffle")
@@ -226,12 +259,31 @@ func _request_powerup_refill(powerup_type: String) -> void:
 		_pending_powerup_refill_type = ""
 		_update_powerup_buttons()
 
-func _powerup_button_text(base: String, charges: int, powerup_type: String) -> String:
+func _powerup_button_icon(base_icon: String, charges: int, powerup_type: String) -> String:
 	if _pending_powerup_refill_type == powerup_type:
-		return "%s: Loading Ad..." % base
+		return ICON_LOADING
 	if charges > 0:
-		return "%s x%d" % [base, charges]
-	return "%s x0 • Watch Ad" % base
+		return base_icon
+	if _is_rewarded_ready():
+		return ICON_FILM
+	return base_icon
+
+func _update_badge(label: Label, charges: int, is_loading: bool) -> void:
+	if label == null:
+		return
+	label.visible = charges > 0
+	label.text = "..." if is_loading else "x%d" % charges
+	label.modulate = Color(0.98, 0.99, 1.0, 0.98) if charges > 0 else Color(0.78, 0.86, 1.0, 0.94)
+
+func _is_rewarded_ready() -> bool:
+	if AdManager == null:
+		return false
+	var provider: Variant = AdManager.provider
+	if provider == null:
+		return false
+	if provider.has_method("is_rewarded_ready"):
+		return bool(provider.call("is_rewarded_ready"))
+	return false
 
 func _is_other_refill_pending(powerup_type: String) -> bool:
 	return not _pending_powerup_refill_type.is_empty() and _pending_powerup_refill_type != powerup_type
@@ -244,6 +296,7 @@ func _finish_run() -> void:
 		return
 	if _ending_transition_started:
 		return
+	get_tree().paused = false
 	_ending_transition_started = true
 	await _play_end_transition()
 	_run_finished = true
@@ -255,12 +308,15 @@ func _play_end_transition() -> void:
 	# End transition should always drive the background fully calm before white-out.
 	BackgroundMood.set_mood(BackgroundMood.Mood.CALM, 0.45)
 	var overlay := ColorRect.new()
+	overlay.name = "RunEndOverlay"
 	overlay.anchor_right = 1.0
 	overlay.anchor_bottom = 1.0
 	overlay.color = Color(1.0, 1.0, 1.0, 0.0)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(overlay)
 
 	var fade := create_tween()
+	fade.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	fade.set_parallel(true)
 	fade.tween_property($BoardView, "modulate:a", 0.0, 0.45)
 	fade.tween_property($UI, "modulate:a", 0.0, 0.35)
@@ -271,11 +327,14 @@ func _play_enter_transition() -> void:
 	board.set_process_input(false)
 	set_process_input(false)
 	var overlay := ColorRect.new()
+	overlay.name = "RunEnterOverlay"
 	overlay.anchor_right = 1.0
 	overlay.anchor_bottom = 1.0
 	overlay.color = Color(1.0, 1.0, 1.0, 1.0)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(overlay)
 	var t := create_tween()
+	t.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	t.tween_property(overlay, "color:a", 0.0, 0.35)
 	t.finished.connect(func() -> void:
 		if is_instance_valid(overlay):

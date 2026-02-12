@@ -1,35 +1,29 @@
-extends Button
-class_name LiquidGlassButton
+extends OptionButton
+class_name LiquidGlassOptionButton
 
 @export var tint: Color = Color(0.95, 0.97, 1.0, 0.22)
 @export var edge_highlight: Color = Color(1.0, 1.0, 1.0, 0.48)
 @export var blur: float = 2.8
-@export var warp_intensity: float = 0.26
-@export var strength_x: float = 11.0
-@export var strength_y: float = 11.0
+@export var warp_intensity: float = 0.24
+@export var strength_x: float = 10.5
+@export var strength_y: float = 10.5
 @export var offset_x: float = 0.0
 @export var offset_y: float = 0.0
-@export var corner_radius: float = 0.3
+@export var corner_radius: float = 0.28
 @export var edge_smoothness: float = 1.05
-@export var edge_width: float = 1.35
-@export var chromatic_strength: float = 1.2
+@export var edge_width: float = 1.3
+@export var chromatic_strength: float = 1.0
 var _last_disabled: bool = false
-var _press_tween: Tween
-var _base_scale: Vector2 = Vector2.ONE
 
 func _ready() -> void:
 	flat = false
 	clip_contents = true
 	focus_mode = Control.FOCUS_NONE
-	_base_scale = scale
 	_apply_style_overrides()
 	_ensure_glass_layer()
 	mouse_entered.connect(_sync_glass_state)
 	mouse_exited.connect(_sync_glass_state)
-	pressed.connect(_sync_glass_state)
-	button_down.connect(_on_button_down)
-	button_up.connect(_on_button_up)
-	toggled.connect(_sync_glass_state)
+	item_selected.connect(_on_item_selected)
 	_last_disabled = disabled
 	_sync_glass_state()
 
@@ -46,10 +40,10 @@ func _apply_style_overrides() -> void:
 	normal.border_width_right = 1
 	normal.border_width_bottom = 1
 	normal.border_color = Color(0.88, 0.95, 1.0, 0.55)
-	normal.corner_radius_top_left = 20
-	normal.corner_radius_top_right = 20
-	normal.corner_radius_bottom_right = 20
-	normal.corner_radius_bottom_left = 20
+	normal.corner_radius_top_left = 18
+	normal.corner_radius_top_right = 18
+	normal.corner_radius_bottom_right = 18
+	normal.corner_radius_bottom_left = 18
 	normal.shadow_size = 0
 	normal.anti_aliasing = true
 	normal.anti_aliasing_size = 1.1
@@ -67,13 +61,11 @@ func _apply_style_overrides() -> void:
 	add_theme_stylebox_override("normal", normal)
 	add_theme_stylebox_override("hover", hover)
 	add_theme_stylebox_override("pressed", pressed)
-	add_theme_stylebox_override("focus", normal)
+	add_theme_stylebox_override("focus", hover)
 	add_theme_stylebox_override("disabled", disabled_style)
 
 	add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1.0))
 	add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
-	add_theme_color_override("font_pressed_color", Color(0.98, 0.99, 1.0, 1.0))
-	add_theme_color_override("font_focus_color", Color(1.0, 1.0, 1.0, 1.0))
 	add_theme_color_override("font_disabled_color", Color(0.84, 0.86, 0.92, 0.82))
 	add_theme_color_override("font_outline_color", Color(0.03, 0.06, 0.12, 0.9))
 	add_theme_constant_override("outline_size", 2)
@@ -114,16 +106,14 @@ func _sync_glass_state() -> void:
 		target_edge = Color(0.86, 0.9, 0.98, 0.22)
 		blur_mul = 0.9
 		warp_mul = 0.75
-	elif button_pressed:
-		target_tint = tint.lightened(0.14)
-		target_edge = edge_highlight.lightened(0.1)
-		blur_mul = 1.08
-		warp_mul = 0.86
 	elif is_hovered():
 		target_tint = tint.lightened(0.08)
 		blur_mul = 1.05
 		warp_mul = 1.08
 	_apply_shader_profile(mat, target_tint, target_edge, blur_mul, warp_mul)
+
+func _on_item_selected(_index: int) -> void:
+	_sync_glass_state()
 
 func _apply_shader_profile(mat: ShaderMaterial, target_tint: Color, target_edge: Color, blur_mul: float, warp_mul: float) -> void:
 	mat.set_shader_parameter("tint", target_tint)
@@ -138,16 +128,3 @@ func _apply_shader_profile(mat: ShaderMaterial, target_tint: Color, target_edge:
 	mat.set_shader_parameter("edge_smoothness", edge_smoothness)
 	mat.set_shader_parameter("edge_width", edge_width)
 	mat.set_shader_parameter("chromatic_strength", chromatic_strength)
-
-func _on_button_down() -> void:
-	_animate_scale(_base_scale * Vector2(0.965, 0.965), 0.08)
-
-func _on_button_up() -> void:
-	_animate_scale(_base_scale, 0.12)
-
-func _animate_scale(target: Vector2, duration: float) -> void:
-	if is_instance_valid(_press_tween):
-		_press_tween.kill()
-	_press_tween = create_tween()
-	_press_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_press_tween.tween_property(self, "scale", target, duration)

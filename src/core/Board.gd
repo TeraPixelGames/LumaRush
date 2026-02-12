@@ -5,14 +5,16 @@ var width: int
 var height: int
 var color_count: int
 var min_match_size: int
+var match_color_mod: int
 var rng: RandomNumberGenerator
 var grid: Array
 
-func _init(w: int = 8, h: int = 10, colors: int = 5, rng_seed: int = -1, min_match: int = 2) -> void:
+func _init(w: int = 8, h: int = 10, colors: int = 5, rng_seed: int = -1, min_match: int = 2, match_mod: int = -1) -> void:
 	width = w
 	height = h
 	color_count = colors
 	min_match_size = max(2, min_match)
+	match_color_mod = match_mod
 	rng = RandomNumberGenerator.new()
 	if rng_seed >= 0:
 		rng.seed = rng_seed
@@ -65,7 +67,7 @@ func find_group(start: Vector2i) -> Array:
 		group.append(p)
 		for d in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 			var np: Vector2i = p + d
-			if _in_bounds(np) and not visited.has(np) and get_tile(np) == target:
+			if _in_bounds(np) and not visited.has(np) and _color_values_match(get_tile(np), target):
 				visited[np] = true
 				stack.append(np)
 	return group
@@ -75,9 +77,9 @@ func has_move() -> bool:
 		for y in range(height):
 			for x in range(width):
 				var v = grid[y][x]
-				if x + 1 < width and grid[y][x + 1] == v:
+				if x + 1 < width and _color_values_match(grid[y][x + 1], v):
 					return true
-				if y + 1 < height and grid[y + 1][x] == v:
+				if y + 1 < height and _color_values_match(grid[y + 1][x], v):
 					return true
 		return false
 
@@ -120,11 +122,17 @@ func shuffle_tiles() -> void:
 	if not has_move():
 		ensure_min_available_matches(1, 80)
 
-func remove_color(color_idx: int) -> int:
+func remove_color(color_idx: int, color_mod: int = -1) -> int:
 	var removed: int = 0
+	var use_bucket: bool = color_mod > 0
+	var target_bucket: int = _pos_mod(color_idx, color_mod) if use_bucket else color_idx
 	for y in range(height):
 		for x in range(width):
-			if int(grid[y][x]) == color_idx:
+			var cell_color: int = int(grid[y][x])
+			var should_remove: bool = cell_color == color_idx
+			if use_bucket:
+				should_remove = _pos_mod(cell_color, color_mod) == target_bucket
+			if should_remove:
 				grid[y][x] = null
 				removed += 1
 	if removed <= 0:
@@ -134,6 +142,21 @@ func remove_color(color_idx: int) -> int:
 	if not has_move():
 		ensure_min_available_matches(1, 80)
 	return removed
+
+func _pos_mod(value: int, m: int) -> int:
+	if m <= 0:
+		return value
+	var r: int = value % m
+	return r + m if r < 0 else r
+
+func _color_values_match(a: Variant, b: Variant) -> bool:
+	if a == null or b == null:
+		return false
+	var ai: int = int(a)
+	var bi: int = int(b)
+	if match_color_mod > 0:
+		return _pos_mod(ai, match_color_mod) == _pos_mod(bi, match_color_mod)
+	return ai == bi
 
 func count_available_matches() -> int:
 	var visited := {}

@@ -1,82 +1,193 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=7 format=3 uid="uid://drwtb62moeens"]
 
-[ext_resource type="Script" path="res://src/scenes/Game.gd" id=1]
-[ext_resource type="PackedScene" path="res://src/visual/BackgroundController.tscn" id=2]
-[ext_resource type="Script" path="res://src/game/BoardView.gd" id=3]
-[ext_resource type="Theme" path="res://src/ui/UiTheme.tres" id=4]
-[ext_resource type="Script" path="res://src/ui/LiquidGlassButton.gd" id=5]
+[ext_resource type="Script" uid="uid://1y8jncy7k6rg" path="res://src/scenes/Game.gd" id="1"]
+[ext_resource type="PackedScene" path="res://src/visual/BackgroundController.tscn" id="2"]
+[ext_resource type="Script" uid="uid://b50b5mfrsh63o" path="res://src/game/BoardView.gd" id="3"]
+[ext_resource type="Theme" uid="uid://c7md3l4sokudj" path="res://src/ui/UiTheme.tres" id="4"]
+[ext_resource type="Script" uid="uid://cm18fs18ym62x" path="res://src/ui/LiquidGlassButton.gd" id="5"]
+[ext_resource type="Script" uid="uid://ddwjca2l8jso8" path="res://src/ui/GlassPanel.gd" id="6"]
 
 [node name="Game" type="Control"]
+layout_mode = 3
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-theme = ExtResource( 4 )
-script = ExtResource( 1 )
+theme = ExtResource("4")
+script = ExtResource("1")
 
-[node name="BackgroundController" parent="." instance=ExtResource( 2 )]
+[node name="BackgroundController" parent="." instance=ExtResource("2")]
 
 [node name="MidVFX" type="Node2D" parent="."]
 
 [node name="BoardView" type="Node2D" parent="."]
-script = ExtResource( 3 )
 position = Vector2(156, 420)
+script = ExtResource("3")
 
 [node name="UI" type="Control" parent="."]
+anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 
 [node name="TopBarBg" type="ColorRect" parent="UI"]
-anchor_left = 0.03
-anchor_top = 0.03
-anchor_right = 0.97
-anchor_bottom = 0.14
-color = Color(0.02, 0.05, 0.1, 0.48)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.16
+anchor_top = 0.024
+anchor_right = 0.84
+anchor_bottom = 0.112
+offset_bottom = -94.584015
+color = Color(0.06, 0.12, 0.24, 0.44)
+script = ExtResource("6")
+blur_radius = 4.6
+tint = Color(0.06, 0.12, 0.24, 0.44)
+edge = Color(0.92, 0.97, 1, 0.26)
+corner_radius = 0.5
+edge_width = 1.2
+warp_intensity = 0.12
+chromatic_strength = 0.14
+
+[node name="TopBarInnerHighlight" type="ColorRect" parent="UI/TopBarBg"]
+layout_mode = 0
+anchor_left = 0.02
+anchor_top = 0.07
+anchor_right = 0.98
+anchor_bottom = 0.48
+color = Color(0.94, 0.98, 1, 0.1)
 
 [node name="TopBar" type="HBoxContainer" parent="UI"]
-anchor_left = 0.05
-anchor_top = 0.05
-anchor_right = 0.95
-anchor_bottom = 0.12
+layout_mode = 0
+anchor_left = 0.19
+anchor_top = 0.03
+anchor_right = 0.81
+anchor_bottom = 0.106
+theme_override_constants/separation = 8
 alignment = 1
-theme_override_constants/separation = 18
 
-[node name="Score" type="Label" parent="UI/TopBar"]
-text = "Score: 0"
+[node name="ScoreBox" type="VBoxContainer" parent="UI/TopBar"]
+layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 34
+theme_override_constants/separation = 2
+
+[node name="ScoreCaption" type="Label" parent="UI/TopBar/ScoreBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "SCORE"
+
+[node name="ScoreValue" type="Label" parent="UI/TopBar/ScoreBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 58
+text = "Score: 0"
+vertical_alignment = 1
 
 [node name="Pause" type="Button" parent="UI/TopBar"]
-script = ExtResource( 5 )
-text = "Pause"
-custom_minimum_size = Vector2(180, 84)
+custom_minimum_size = Vector2(96, 96)
+layout_mode = 2
+size_flags_vertical = 0
+text = "II"
+script = ExtResource("5")
+corner_radius = 0.5
 
 [node name="Powerups" type="HBoxContainer" parent="UI"]
+layout_mode = 0
 anchor_left = 0.06
-anchor_top = 0.79
+anchor_top = 0.81
 anchor_right = 0.94
-anchor_bottom = 0.87
+anchor_bottom = 0.915
+theme_override_constants/separation = 18
 alignment = 1
-theme_override_constants/separation = 14
 
 [node name="Undo" type="Button" parent="UI/Powerups"]
-script = ExtResource( 5 )
-text = "Undo x0"
-custom_minimum_size = Vector2(0, 90)
+custom_minimum_size = Vector2(0, 118)
+layout_mode = 2
 size_flags_horizontal = 3
+text = "↶ Undo"
+script = ExtResource("5")
+
+[node name="Badge" type="Label" parent="UI/Powerups/Undo"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -28.0
+offset_top = 8.0
+offset_right = 28.0
+offset_bottom = 40.0
+text = "x0"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="RemoveColor" type="Button" parent="UI/Powerups"]
-script = ExtResource( 5 )
-text = "Prism x0"
-custom_minimum_size = Vector2(0, 90)
+custom_minimum_size = Vector2(0, 118)
+layout_mode = 2
 size_flags_horizontal = 3
+text = "◈ Prism"
+script = ExtResource("5")
+
+[node name="Badge" type="Label" parent="UI/Powerups/RemoveColor"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -28.0
+offset_top = 8.0
+offset_right = 28.0
+offset_bottom = 40.0
+text = "x0"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="Shuffle" type="Button" parent="UI/Powerups"]
-script = ExtResource( 5 )
-text = "Shuffle x0"
-custom_minimum_size = Vector2(0, 90)
+custom_minimum_size = Vector2(0, 118)
+layout_mode = 2
 size_flags_horizontal = 3
+text = "⤮ Shuffle"
+script = ExtResource("5")
+
+[node name="Badge" type="Label" parent="UI/Powerups/Shuffle"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -28.0
+offset_top = 8.0
+offset_right = 28.0
+offset_bottom = 40.0
+text = "x0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BoardGlow" type="ColorRect" parent="UI"]
+layout_mode = 0
+anchor_left = 0.2
+anchor_top = 0.2
+anchor_right = 0.8
+anchor_bottom = 0.74
+color = Color(0.58, 0.78, 1, 0.08)
+script = ExtResource("6")
+blur_radius = 7.4
+tint = Color(0.58, 0.78, 1, 0.08)
+edge = Color(0.74, 0.86, 1, 0.16)
+corner_radius = 0.05
+edge_width = 1.0
+warp_intensity = 0.05
+chromatic_strength = 0.05
+
+[node name="BoardFrame" type="ColorRect" parent="UI"]
+layout_mode = 0
+anchor_left = 0.22
+anchor_top = 0.22
+anchor_right = 0.78
+anchor_bottom = 0.72
+color = Color(0.2, 0.32, 0.58, 0.24)
+script = ExtResource("6")
+blur_radius = 6.2
+tint = Color(0.2, 0.32, 0.58, 0.24)
+edge = Color(1, 1, 1, 0.2)
+corner_radius = 0.06
+edge_width = 1.0
+warp_intensity = 0.09
+chromatic_strength = 0.08
 
 [node name="PowerupFlash" type="ColorRect" parent="UI"]
 visible = false
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 color = Color(1, 1, 1, 0)

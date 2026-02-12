@@ -5,6 +5,11 @@ signal quit
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	Typography.style_pause_overlay(self)
+
+func _notification(what: int) -> void:
+	if what == Control.NOTIFICATION_RESIZED:
+		Typography.style_pause_overlay(self)
 
 func _on_resume_pressed() -> void:
 	emit_signal("resume")

@@ -18,11 +18,11 @@ color = Color(0, 0, 0, 0.4)
 
 [node name="Panel" type="ColorRect" parent="."]
 script = ExtResource( 2 )
-anchor_left = 0.15
-anchor_top = 0.32
-anchor_right = 0.85
-anchor_bottom = 0.68
-color = Color(0.05, 0.08, 0.14, 0.56)
+anchor_left = 0.1
+anchor_top = 0.28
+anchor_right = 0.9
+anchor_bottom = 0.72
+color = Color(0.03, 0.07, 0.15, 0.68)
 
 [node name="VBox" type="VBoxContainer" parent="Panel"]
 anchor_left = 0.1
@@ -30,7 +30,7 @@ anchor_top = 0.1
 anchor_right = 0.9
 anchor_bottom = 0.9
 alignment = 1
-theme_override_constants/separation = 16
+theme_override_constants/separation = 18
 
 [node name="Title" type="Label" parent="Panel/VBox"]
 text = "Save Your Streak"
@@ -45,12 +45,12 @@ theme_override_font_sizes/font_size = 28
 [node name="SaveButton" type="Button" parent="Panel/VBox"]
 script = ExtResource( 4 )
 text = "Watch Ad"
-custom_minimum_size = Vector2(0, 98)
+custom_minimum_size = Vector2(0, 102)
 
 [node name="Close" type="Button" parent="Panel/VBox"]
 script = ExtResource( 4 )
 text = "Not Now"
-custom_minimum_size = Vector2(0, 98)
+custom_minimum_size = Vector2(0, 102)
 
 [connection signal="pressed" from="Panel/VBox/SaveButton" to="." method="_on_save_pressed"]
 [connection signal="pressed" from="Panel/VBox/Close" to="." method="_on_close_pressed"]

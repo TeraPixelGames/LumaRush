@@ -12,6 +12,22 @@ signal match_haptic_triggered(duration_ms: int, amplitude: float)
 @export var colors := 5
 @export var tile_size := 96.0
 
+const TILE_PALETTE_MODERN := [
+	Color(0.38, 0.78, 1.0, 0.68),  # cyan-blue
+	Color(0.90, 0.52, 0.98, 0.68), # violet
+	Color(0.48, 0.94, 0.72, 0.68), # mint
+	Color(1.0, 0.78, 0.36, 0.68),  # amber
+	Color(1.0, 0.48, 0.62, 0.68),  # rose
+]
+
+const TILE_PALETTE_LEGACY := [
+	Color(0.56, 0.80, 1.0, 0.64),  # soft blue
+	Color(0.86, 0.62, 0.84, 0.64), # mauve
+	Color(0.78, 0.62, 0.92, 0.64), # lavender
+	Color(0.90, 0.62, 0.78, 0.64), # rose-peach
+	Color(0.90, 0.78, 0.66, 0.64), # warm sand
+]
+
 var board: Board
 var tiles: Array = []
 var _animating: bool = false
@@ -20,15 +36,19 @@ var _game_over_emitted: bool = false
 var _hint_timer: Timer
 var _hint_tween: Tween
 var _hint_group: Array = []
+var _tile_gap_px: float = 8.0
 
 func _ready() -> void:
 	var board_seed: int = 1234 if FeatureFlags.is_visual_test_mode() else -1
 	_min_match_size = FeatureFlags.min_match_size()
+	colors = _palette_size()
 	board = Board.new(width, height, colors, board_seed, _min_match_size)
+	_normalize_board_color_ids()
 	var required_matches: int = int(ceil(FeatureFlags.gameplay_matches_normalizer()))
 	board.ensure_min_available_matches(required_matches)
 	_create_tiles()
 	_refresh_tiles()
+	queue_redraw()
 	_setup_hint_timer()
 	_check_no_moves_and_emit()
 
@@ -65,6 +85,8 @@ func _handle_click(pos: Vector2) -> void:
 	var snapshot := board.grid.duplicate(true)
 	var resolved := board.resolve_move(Vector2i(x, y))
 	if resolved.size() >= _min_match_size:
+		# Keep color ids strictly in palette bounds before visual refresh/animation.
+		_normalize_board_color_ids()
 		_clear_hint()
 		await _animate_resolution(group, snapshot)
 		_trigger_match_haptic()
@@ -88,6 +110,7 @@ func capture_snapshot() -> Array:
 func restore_snapshot(snapshot_grid: Array) -> void:
 	_clear_hint()
 	board.restore(snapshot_grid)
+	_normalize_board_color_ids()
 	_game_over_emitted = false
 	_refresh_tiles()
 	if _check_no_moves_and_emit():
@@ -118,7 +141,7 @@ func apply_remove_color_powerup(color_idx: int = -1) -> Dictionary:
 		return {"removed": 0, "color_idx": -1}
 	_animating = true
 	_clear_hint()
-	VFXManager.play_pixel_explosion(removed_cells, tile_size, global_position, board.grid)
+	VFXManager.play_prism_clear(removed_cells, tile_size, global_position, target_color)
 	var fade: Tween = create_tween()
 	fade.set_parallel(true)
 	for p in removed_cells:
@@ -127,7 +150,8 @@ func apply_remove_color_powerup(color_idx: int = -1) -> Dictionary:
 		fade.tween_property(tile, "modulate:a", 0.0, 0.18)
 	await fade.finished
 	var removed: int = board.remove_color(target_color)
-	_refresh_tiles()
+	_normalize_board_color_ids()
+	_rebuild_tiles_from_grid()
 	await _animate_powerup_release()
 	if _check_no_moves_and_emit():
 		_restart_hint_timer()
@@ -139,28 +163,40 @@ func _refresh_tiles() -> void:
 		for x in range(width):
 			var tile: ColorRect = tiles[y][x]
 			var c := _color_from_index(int(board.grid[y][x]))
-			tile.color = c
+			_apply_tile_color(tile, c)
 			tile.modulate = Color(1, 1, 1, 1)
 			tile.scale = Vector2.ONE
-			tile.position = Vector2(x * tile_size, y * tile_size)
+			tile.position = _tile_origin(Vector2i(x, y))
 			var mat: ShaderMaterial = tile.material
 			if mat:
-				mat.set_shader_parameter("tint_color", c)
 				mat.set_shader_parameter("blur_radius", _blur_radius())
 
 func _create_tile_node(cell: Vector2i, color: Color) -> ColorRect:
 	var tile := ColorRect.new()
-	tile.size = Vector2(tile_size, tile_size)
+	var visual_size: float = max(12.0, tile_size - _tile_gap_px)
+	tile.size = Vector2(visual_size, visual_size)
 	tile.pivot_offset = tile.size * 0.5
-	tile.position = Vector2(cell.x * tile_size, cell.y * tile_size)
+	tile.position = _tile_origin(cell)
 	tile.color = color
 	var mat := ShaderMaterial.new()
 	mat.shader = preload("res://src/visual/TileGlass.gdshader")
 	mat.set_shader_parameter("tint_color", color)
 	mat.set_shader_parameter("blur_radius", _blur_radius())
+	_apply_tile_design_shader_profile(mat)
 	tile.material = mat
 	add_child(tile)
 	return tile
+
+func _rebuild_tiles_from_grid() -> void:
+	for row in tiles:
+		for tile in row:
+			var tile_node: ColorRect = tile as ColorRect
+			if is_instance_valid(tile_node):
+				tile_node.queue_free()
+	tiles.clear()
+	_create_tiles()
+	_refresh_tiles()
+	queue_redraw()
 
 func _animate_resolution(group: Array, snapshot: Array) -> void:
 	VFXManager.play_pixel_explosion(group, tile_size, global_position, snapshot)
@@ -197,15 +233,18 @@ func _animate_resolution(group: Array, snapshot: Array) -> void:
 			var node: ColorRect = survivors[i] as ColorRect
 			var target_y: int = start_y + i
 			new_tiles[target_y][x] = node
-			fall_tween.tween_property(node, "position:y", target_y * tile_size, 0.22)
+			# Force visual to match final logical color during fall, not only after settle.
+			var target_color: Color = _color_from_index(int(final_grid[target_y][x]))
+			_apply_tile_color(node, target_color)
+			fall_tween.tween_property(node, "position:y", (target_y * tile_size) + (_tile_gap_px * 0.5), 0.22)
 
 		for y in range(start_y):
 			var spawn_color: Color = _color_from_index(int(final_grid[y][x]))
 			var spawned: ColorRect = _create_tile_node(Vector2i(x, y), spawn_color)
 			spawned.modulate.a = 0.0
-			spawned.position.y = -(start_y - y) * tile_size
+			spawned.position.y = -(start_y - y) * tile_size + (_tile_gap_px * 0.5)
 			new_tiles[y][x] = spawned
-			fall_tween.tween_property(spawned, "position:y", y * tile_size, 0.24)
+			fall_tween.tween_property(spawned, "position:y", (y * tile_size) + (_tile_gap_px * 0.5), 0.24)
 			fall_tween.tween_property(spawned, "modulate:a", 1.0, 0.18)
 	await fall_tween.finished
 
@@ -218,14 +257,14 @@ func _animate_resolution(group: Array, snapshot: Array) -> void:
 	_refresh_tiles()
 
 func _color_from_index(idx: int) -> Color:
-	var palette := [
-		Color(0.55, 0.86, 1.0, 0.55),
-		Color(0.98, 0.65, 0.92, 0.55),
-		Color(0.7, 0.98, 0.8, 0.55),
-		Color(1.0, 0.9, 0.6, 0.55),
-		Color(0.95, 0.7, 0.7, 0.55),
-	]
-	return palette[idx % palette.size()]
+	var palette: Array = _tile_palette()
+	return palette[posmod(idx, palette.size())]
+
+func _apply_tile_color(tile: ColorRect, color: Color) -> void:
+	tile.color = color
+	var mat: ShaderMaterial = tile.material as ShaderMaterial
+	if mat:
+		mat.set_shader_parameter("tint_color", color)
 
 func _blur_radius() -> float:
 	return 2.0 if FeatureFlags.tile_blur_mode() == FeatureFlags.TileBlurMode.LITE else 6.0
@@ -292,8 +331,8 @@ func _apply_hint(group: Array) -> void:
 	for p in _hint_group:
 		var tile: ColorRect = tiles[p.y][p.x]
 		tile.z_index = 200
+		tile.modulate = Color(1.0, 1.0, 1.0, 1.0)
 		_hint_tween.parallel().tween_property(tile, "scale", Vector2(1.48, 1.48), attack).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		_hint_tween.parallel().tween_property(tile, "modulate", Color(1.0, 0.92, 0.35, 1.0), attack)
 		_hint_tween.parallel().tween_property(tile, "rotation_degrees", -3.0, attack * 0.5)
 		_hint_tween.parallel().tween_property(tile, "rotation_degrees", 3.0, attack * 0.5).set_delay(attack * 0.5)
 	_hint_tween.chain()
@@ -305,7 +344,6 @@ func _apply_hint(group: Array) -> void:
 	for p in _hint_group:
 		var tile: ColorRect = tiles[p.y][p.x]
 		_hint_tween.parallel().tween_property(tile, "scale", Vector2.ONE, settle).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		_hint_tween.parallel().tween_property(tile, "modulate", Color(1.0, 1.0, 1.0, 1.0), settle)
 
 func _clear_hint() -> void:
 	if is_instance_valid(_hint_tween):
@@ -343,6 +381,59 @@ func _positions_for_color(color_idx: int) -> Array:
 			if int(board.grid[y][x]) == color_idx:
 				out.append(Vector2i(x, y))
 	return out
+
+func _palette_size() -> int:
+	return _tile_palette().size()
+
+func _tile_palette() -> Array:
+	return TILE_PALETTE_LEGACY if FeatureFlags.tile_design_mode() == FeatureFlags.TileDesignMode.LEGACY else TILE_PALETTE_MODERN
+
+func _apply_tile_design_shader_profile(mat: ShaderMaterial) -> void:
+	if mat == null:
+		return
+	if FeatureFlags.tile_design_mode() == FeatureFlags.TileDesignMode.LEGACY:
+		mat.set_shader_parameter("corner_radius", 0.06)
+		mat.set_shader_parameter("border", 0.055)
+		mat.set_shader_parameter("tint_mix", 0.84)
+		mat.set_shader_parameter("saturation_boost", 1.06)
+		mat.set_shader_parameter("bg_luma_mix", 0.42)
+		mat.set_shader_parameter("specular_strength", 0.24)
+		mat.set_shader_parameter("inner_shadow_strength", 0.22)
+		mat.set_shader_parameter("edge_color", Color(0.84, 0.9, 1.0, 0.28))
+	else:
+		mat.set_shader_parameter("corner_radius", 0.11)
+		mat.set_shader_parameter("border", 0.08)
+		mat.set_shader_parameter("tint_mix", 0.98)
+		mat.set_shader_parameter("saturation_boost", 1.22)
+		mat.set_shader_parameter("bg_luma_mix", 0.22)
+		mat.set_shader_parameter("specular_strength", 0.36)
+		mat.set_shader_parameter("inner_shadow_strength", 0.26)
+		mat.set_shader_parameter("edge_color", Color(0.88, 0.95, 1.0, 0.42))
+
+func _normalize_board_color_ids() -> void:
+	if board == null or board.grid.is_empty():
+		return
+	var mod_count: int = _palette_size()
+	for y in range(height):
+		for x in range(width):
+			var value: Variant = board.grid[y][x]
+			if value == null:
+				continue
+			board.grid[y][x] = posmod(int(value), mod_count)
+
+func _tile_origin(cell: Vector2i) -> Vector2:
+	return Vector2(
+		(cell.x * tile_size) + (_tile_gap_px * 0.5),
+		(cell.y * tile_size) + (_tile_gap_px * 0.5)
+	)
+
+func _draw() -> void:
+	var board_size: Vector2 = Vector2(width * tile_size, height * tile_size)
+	var glow_rect := Rect2(Vector2(-14.0, -14.0), board_size + Vector2(28.0, 28.0))
+	draw_rect(glow_rect, Color(0.62, 0.78, 1.0, 0.08), true)
+	var frame_rect := Rect2(Vector2(-6.0, -6.0), board_size + Vector2(12.0, 12.0))
+	draw_rect(frame_rect, Color(0.2, 0.32, 0.58, 0.2), true)
+	draw_rect(frame_rect, Color(1.0, 1.0, 1.0, 0.2), false, 1.0)
 
 func _animate_powerup_charge(tint: Color) -> void:
 	var t: Tween = create_tween()

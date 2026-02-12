@@ -3,6 +3,7 @@ class_name FeatureFlags
 
 # Feature flags / config constants
 enum TileBlurMode { LITE, HEAVY }
+enum TileDesignMode { MODERN, LEGACY }
 
 # Determinism toggles for UAT (override via ProjectSettings at runtime)
 const VISUAL_TEST_MODE := false
@@ -10,6 +11,7 @@ const AUDIO_TEST_MODE := false
 
 # Performance toggle for tiles
 const TILE_BLUR_MODE := TileBlurMode.LITE
+const TILE_DESIGN_MODE := TileDesignMode.MODERN
 const MIN_MATCH_SIZE := 3
 
 # Audio tuning (95 BPM stems)
@@ -34,11 +36,11 @@ const CLEAR_HIGH_SCORE_ON_BOOT := false
 const AD_RETRY_ATTEMPTS := 2
 const AD_RETRY_INTERVAL_SECONDS := 0.35
 const AD_PRELOAD_POLL_SECONDS := 1.25
-const STARFIELD_CALM_DENSITY := 1.4
+const STARFIELD_CALM_DENSITY := 1.9
 const STARFIELD_HYPE_DENSITY := 2.8
 const STARFIELD_CALM_SPEED := 1.0
 const STARFIELD_HYPE_SPEED := 2.0
-const STARFIELD_CALM_BRIGHTNESS := 0.8
+const STARFIELD_CALM_BRIGHTNESS := 1.42
 const STARFIELD_HYPE_BRIGHTNESS := 1.35
 const STARFIELD_BEAT_PULSE_DEPTH := 0.2
 const STARFIELD_MATCH_PULSE_SECONDS := 0.2
@@ -46,9 +48,12 @@ const STARFIELD_MATCH_PULSE_DENSITY_MULT := 1.45
 const STARFIELD_MATCH_PULSE_SPEED_MULT := 1.2
 const STARFIELD_MATCH_PULSE_BRIGHTNESS_MULT := 1.25
 const STARFIELD_HYPE_EMISSION_FLOOR := 0.35
+const STARFIELD_CALM_EMISSION_FLOOR := 0.78
 const STARFIELD_EMISSION_RAMP_UP_SECONDS := 0.14
-const STARFIELD_BASE_POINT_COLOR := Color(1, 1, 1, 1)
-const STARFIELD_BASE_STREAK_COLOR := Color(1, 1, 1, 1)
+const STARFIELD_CALM_POINT_COLOR := Color(0.26, 0.82, 1.0, 1.0)
+const STARFIELD_CALM_STREAK_COLOR := Color(0.62, 0.94, 1.0, 1.0)
+const STARFIELD_HYPE_POINT_COLOR := Color(1.0, 1.0, 1.0, 1.0)
+const STARFIELD_HYPE_STREAK_COLOR := Color(1.0, 1.0, 1.0, 1.0)
 const STARFIELD_BOOST_POINT_COLOR := Color(1, 1, 1, 1)
 const STARFIELD_BOOST_STREAK_COLOR := Color(1, 1, 1, 1)
 const HAPTICS_ENABLED := true
@@ -79,6 +84,12 @@ static func tile_blur_mode() -> int:
 	if ProjectSettings.has_setting("lumarush/tile_blur_mode"):
 		return int(ProjectSettings.get_setting("lumarush/tile_blur_mode"))
 	return TILE_BLUR_MODE
+
+static func tile_design_mode() -> int:
+	if ProjectSettings.has_setting("lumarush/tile_design_mode"):
+		var value: int = int(ProjectSettings.get_setting("lumarush/tile_design_mode"))
+		return clamp(value, TileDesignMode.MODERN, TileDesignMode.LEGACY)
+	return TILE_DESIGN_MODE
 
 static func min_match_size() -> int:
 	if ProjectSettings.has_setting("lumarush/min_match_size"):
@@ -225,20 +236,35 @@ static func starfield_hype_emission_floor() -> float:
 		return clamp(float(ProjectSettings.get_setting("lumarush/starfield_hype_emission_floor")), 0.0, 1.0)
 	return STARFIELD_HYPE_EMISSION_FLOOR
 
+static func starfield_calm_emission_floor() -> float:
+	if ProjectSettings.has_setting("lumarush/starfield_calm_emission_floor"):
+		return clamp(float(ProjectSettings.get_setting("lumarush/starfield_calm_emission_floor")), 0.0, 1.0)
+	return STARFIELD_CALM_EMISSION_FLOOR
+
 static func starfield_emission_ramp_up_seconds() -> float:
 	if ProjectSettings.has_setting("lumarush/starfield_emission_ramp_up_seconds"):
 		return max(0.0, float(ProjectSettings.get_setting("lumarush/starfield_emission_ramp_up_seconds")))
 	return STARFIELD_EMISSION_RAMP_UP_SECONDS
 
-static func starfield_base_point_color() -> Color:
-	if ProjectSettings.has_setting("lumarush/starfield_base_point_color"):
-		return ProjectSettings.get_setting("lumarush/starfield_base_point_color")
-	return STARFIELD_BASE_POINT_COLOR
+static func starfield_calm_point_color() -> Color:
+	if ProjectSettings.has_setting("lumarush/starfield_calm_point_color"):
+		return ProjectSettings.get_setting("lumarush/starfield_calm_point_color")
+	return STARFIELD_CALM_POINT_COLOR
 
-static func starfield_base_streak_color() -> Color:
-	if ProjectSettings.has_setting("lumarush/starfield_base_streak_color"):
-		return ProjectSettings.get_setting("lumarush/starfield_base_streak_color")
-	return STARFIELD_BASE_STREAK_COLOR
+static func starfield_calm_streak_color() -> Color:
+	if ProjectSettings.has_setting("lumarush/starfield_calm_streak_color"):
+		return ProjectSettings.get_setting("lumarush/starfield_calm_streak_color")
+	return STARFIELD_CALM_STREAK_COLOR
+
+static func starfield_hype_point_color() -> Color:
+	if ProjectSettings.has_setting("lumarush/starfield_hype_point_color"):
+		return ProjectSettings.get_setting("lumarush/starfield_hype_point_color")
+	return STARFIELD_HYPE_POINT_COLOR
+
+static func starfield_hype_streak_color() -> Color:
+	if ProjectSettings.has_setting("lumarush/starfield_hype_streak_color"):
+		return ProjectSettings.get_setting("lumarush/starfield_hype_streak_color")
+	return STARFIELD_HYPE_STREAK_COLOR
 
 static func starfield_boost_point_color() -> Color:
 	if ProjectSettings.has_setting("lumarush/starfield_boost_point_color"):
