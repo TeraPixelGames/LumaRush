@@ -28,6 +28,11 @@ func play_pixel_explosion(group: Array, tile_size: float, board_origin: Vector2,
 	var tex := ImageTexture.create_from_image(img)
 	var explosion: Node2D = EXPLOSION_SCENE.instantiate()
 	var parent := get_tree().current_scene
+	if parent == null:
+		if get_tree() and get_tree().root:
+			parent = get_tree().root
+		else:
+			return
 	parent.add_child(explosion)
 	var pos := board_origin + Vector2(min_x * tile_size, min_y * tile_size)
 	explosion.position = pos

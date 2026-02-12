@@ -34,6 +34,12 @@ func _spawn_particles(tex: Texture2D) -> void:
 	particles.emitting = true
 
 func _start() -> void:
+	var mat: ShaderMaterial = sprite.material as ShaderMaterial
+	if mat == null:
+		queue_free()
+		return
 	var t := create_tween()
-	t.tween_property(sprite.material, "shader_parameter/progress", 1.0, 0.5)
+	t.tween_method(func(v: float) -> void:
+		mat.set_shader_parameter("progress", v)
+	, 0.0, 1.0, 0.5)
 	t.tween_callback(Callable(self, "queue_free"))

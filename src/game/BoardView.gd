@@ -3,6 +3,9 @@ class_name BoardView
 
 signal match_made(group: Array)
 signal no_moves
+signal move_committed(group: Array, snapshot: Array)
+signal match_click_haptic_triggered(duration_ms: int, amplitude: float)
+signal match_haptic_triggered(duration_ms: int, amplitude: float)
 
 @export var width := 8
 @export var height := 10
@@ -47,9 +50,9 @@ func _input(event: InputEvent) -> void:
 		_handle_click(event.position)
 
 func _handle_click(pos: Vector2) -> void:
-	var local := to_local(pos)
-	var x := int(floor(local.x / tile_size))
-	var y := int(floor(local.y / tile_size))
+	var cell: Vector2i = _cell_from_screen_pos(pos)
+	var x: int = cell.x
+	var y: int = cell.y
 	if x < 0 or x >= width or y < 0 or y >= height:
 		return
 	if not _check_no_moves_and_emit():
@@ -57,16 +60,86 @@ func _handle_click(pos: Vector2) -> void:
 	var group := board.find_group(Vector2i(x, y))
 	if group.size() < _min_match_size:
 		return
+	_trigger_match_click_haptic()
 	_animating = true
 	var snapshot := board.grid.duplicate(true)
 	var resolved := board.resolve_move(Vector2i(x, y))
 	if resolved.size() >= _min_match_size:
 		_clear_hint()
 		await _animate_resolution(group, snapshot)
+		_trigger_match_haptic()
+		emit_signal("move_committed", group, snapshot)
 		emit_signal("match_made", group)
 		if _check_no_moves_and_emit():
 			_restart_hint_timer()
 	_animating = false
+
+func _cell_from_screen_pos(screen_pos: Vector2) -> Vector2i:
+	var canvas_pos: Vector2 = screen_pos
+	var viewport: Viewport = get_viewport()
+	if viewport:
+		canvas_pos = viewport.get_canvas_transform().affine_inverse() * screen_pos
+	var local_canvas: Vector2 = to_local(canvas_pos)
+	var local_direct: Vector2 = to_local(screen_pos)
+	var x_canvas: int = int(floor(local_canvas.x / tile_size))
+	var y_canvas: int = int(floor(local_canvas.y / tile_size))
+	if x_canvas >= 0 and x_canvas < width and y_canvas >= 0 and y_canvas < height:
+		return Vector2i(x_canvas, y_canvas)
+	var x_direct: int = int(floor(local_direct.x / tile_size))
+	var y_direct: int = int(floor(local_direct.y / tile_size))
+	return Vector2i(x_direct, y_direct)
+
+func capture_snapshot() -> Array:
+	return board.snapshot()
+
+func restore_snapshot(snapshot_grid: Array) -> void:
+	_clear_hint()
+	board.restore(snapshot_grid)
+	_game_over_emitted = false
+	_refresh_tiles()
+	if _check_no_moves_and_emit():
+		_restart_hint_timer()
+
+func apply_shuffle_powerup() -> bool:
+	if _animating:
+		return false
+	_animating = true
+	_clear_hint()
+	await _animate_powerup_charge(Color(0.7, 0.95, 1.0, 1.0))
+	board.shuffle_tiles()
+	_refresh_tiles()
+	await _animate_powerup_release()
+	if _check_no_moves_and_emit():
+		_restart_hint_timer()
+	_animating = false
+	return true
+
+func apply_remove_color_powerup(color_idx: int = -1) -> Dictionary:
+	if _animating:
+		return {"removed": 0, "color_idx": -1}
+	var target_color: int = color_idx if color_idx >= 0 else _best_removal_color()
+	if target_color < 0:
+		return {"removed": 0, "color_idx": -1}
+	var removed_cells: Array = _positions_for_color(target_color)
+	if removed_cells.is_empty():
+		return {"removed": 0, "color_idx": -1}
+	_animating = true
+	_clear_hint()
+	VFXManager.play_pixel_explosion(removed_cells, tile_size, global_position, board.grid)
+	var fade: Tween = create_tween()
+	fade.set_parallel(true)
+	for p in removed_cells:
+		var tile: ColorRect = tiles[p.y][p.x]
+		fade.tween_property(tile, "scale", Vector2(1.25, 1.25), 0.14)
+		fade.tween_property(tile, "modulate:a", 0.0, 0.18)
+	await fade.finished
+	var removed: int = board.remove_color(target_color)
+	_refresh_tiles()
+	await _animate_powerup_release()
+	if _check_no_moves_and_emit():
+		_restart_hint_timer()
+	_animating = false
+	return {"removed": removed, "color_idx": target_color}
 
 func _refresh_tiles() -> void:
 	for y in range(height):
@@ -254,3 +327,64 @@ func _clear_hint() -> void:
 				tile.rotation_degrees = 0.0
 				tile.z_index = 0
 	_hint_group.clear()
+
+func _best_removal_color() -> int:
+	var counts: Dictionary = {}
+	for y in range(height):
+		for x in range(width):
+			var c: int = int(board.grid[y][x])
+			counts[c] = int(counts.get(c, 0)) + 1
+	var best_color: int = -1
+	var best_count: int = 0
+	for c in counts.keys():
+		var count: int = int(counts[c])
+		if count > best_count:
+			best_count = count
+			best_color = int(c)
+	return best_color
+
+func _positions_for_color(color_idx: int) -> Array:
+	var out: Array = []
+	for y in range(height):
+		for x in range(width):
+			if int(board.grid[y][x]) == color_idx:
+				out.append(Vector2i(x, y))
+	return out
+
+func _animate_powerup_charge(tint: Color) -> void:
+	var t: Tween = create_tween()
+	t.set_parallel(true)
+	for row in tiles:
+		for tile in row:
+			var tile_node: ColorRect = tile as ColorRect
+			t.tween_property(tile_node, "modulate", tint, 0.12)
+			t.tween_property(tile_node, "scale", Vector2(1.04, 1.04), 0.12)
+	await t.finished
+
+func _animate_powerup_release() -> void:
+	var t: Tween = create_tween()
+	t.set_parallel(true)
+	for row in tiles:
+		for tile in row:
+			var tile_node: ColorRect = tile as ColorRect
+			t.tween_property(tile_node, "modulate", Color(1, 1, 1, 1), 0.18)
+			t.tween_property(tile_node, "scale", Vector2.ONE, 0.18)
+	await t.finished
+
+func _trigger_match_haptic() -> bool:
+	if not FeatureFlags.haptics_enabled():
+		return false
+	var duration_ms: int = FeatureFlags.match_haptic_duration_ms()
+	var amplitude: float = FeatureFlags.match_haptic_amplitude()
+	Input.vibrate_handheld(duration_ms, amplitude)
+	emit_signal("match_haptic_triggered", duration_ms, amplitude)
+	return true
+
+func _trigger_match_click_haptic() -> bool:
+	if not FeatureFlags.haptics_enabled():
+		return false
+	var duration_ms: int = FeatureFlags.match_click_haptic_duration_ms()
+	var amplitude: float = FeatureFlags.match_click_haptic_amplitude()
+	Input.vibrate_handheld(duration_ms, amplitude)
+	emit_signal("match_click_haptic_triggered", duration_ms, amplitude)
+	return true

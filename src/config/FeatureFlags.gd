@@ -31,6 +31,18 @@ const HINT_PULSE_SPEED_MULTIPLIER := 0.45
 const AUDIO_TRACK_ID := "glassgrid"
 const AUDIO_TRACK_MANIFEST_PATH := "res://src/audio/tracks.json"
 const CLEAR_HIGH_SCORE_ON_BOOT := false
+const AD_RETRY_ATTEMPTS := 2
+const AD_RETRY_INTERVAL_SECONDS := 0.35
+const HAPTICS_ENABLED := true
+const MATCH_CLICK_HAPTIC_DURATION_MS := 14
+const MATCH_CLICK_HAPTIC_AMPLITUDE := 0.35
+const MATCH_HAPTIC_DURATION_MS := 26
+const MATCH_HAPTIC_AMPLITUDE := 0.5
+const POWERUP_UNDO_CHARGES := 2
+const POWERUP_REMOVE_COLOR_CHARGES := 1
+const POWERUP_SHUFFLE_CHARGES := 1
+const POWERUP_FLASH_ALPHA := 0.22
+const POWERUP_FLASH_SECONDS := 0.24
 
 # Screenshot/UAT
 const GOLDEN_RESOLUTION := Vector2i(1170, 2532) # iPhone portrait
@@ -119,3 +131,63 @@ static func clear_high_score_on_boot() -> bool:
 	if ProjectSettings.has_setting("lumarush/clear_high_score_on_boot"):
 		return bool(ProjectSettings.get_setting("lumarush/clear_high_score_on_boot"))
 	return CLEAR_HIGH_SCORE_ON_BOOT
+
+static func ad_retry_attempts() -> int:
+	if ProjectSettings.has_setting("lumarush/ad_retry_attempts"):
+		return max(0, int(ProjectSettings.get_setting("lumarush/ad_retry_attempts")))
+	return AD_RETRY_ATTEMPTS
+
+static func ad_retry_interval_seconds() -> float:
+	if ProjectSettings.has_setting("lumarush/ad_retry_interval_seconds"):
+		return max(0.05, float(ProjectSettings.get_setting("lumarush/ad_retry_interval_seconds")))
+	return AD_RETRY_INTERVAL_SECONDS
+
+static func haptics_enabled() -> bool:
+	if ProjectSettings.has_setting("lumarush/haptics_enabled"):
+		return bool(ProjectSettings.get_setting("lumarush/haptics_enabled"))
+	return HAPTICS_ENABLED
+
+static func match_haptic_duration_ms() -> int:
+	if ProjectSettings.has_setting("lumarush/match_haptic_duration_ms"):
+		return max(0, int(ProjectSettings.get_setting("lumarush/match_haptic_duration_ms")))
+	return MATCH_HAPTIC_DURATION_MS
+
+static func match_haptic_amplitude() -> float:
+	if ProjectSettings.has_setting("lumarush/match_haptic_amplitude"):
+		return clamp(float(ProjectSettings.get_setting("lumarush/match_haptic_amplitude")), 0.0, 1.0)
+	return MATCH_HAPTIC_AMPLITUDE
+
+static func match_click_haptic_duration_ms() -> int:
+	if ProjectSettings.has_setting("lumarush/match_click_haptic_duration_ms"):
+		return max(0, int(ProjectSettings.get_setting("lumarush/match_click_haptic_duration_ms")))
+	return MATCH_CLICK_HAPTIC_DURATION_MS
+
+static func match_click_haptic_amplitude() -> float:
+	if ProjectSettings.has_setting("lumarush/match_click_haptic_amplitude"):
+		return clamp(float(ProjectSettings.get_setting("lumarush/match_click_haptic_amplitude")), 0.0, 1.0)
+	return MATCH_CLICK_HAPTIC_AMPLITUDE
+
+static func powerup_undo_charges() -> int:
+	if ProjectSettings.has_setting("lumarush/powerup_undo_charges"):
+		return max(0, int(ProjectSettings.get_setting("lumarush/powerup_undo_charges")))
+	return POWERUP_UNDO_CHARGES
+
+static func powerup_remove_color_charges() -> int:
+	if ProjectSettings.has_setting("lumarush/powerup_remove_color_charges"):
+		return max(0, int(ProjectSettings.get_setting("lumarush/powerup_remove_color_charges")))
+	return POWERUP_REMOVE_COLOR_CHARGES
+
+static func powerup_shuffle_charges() -> int:
+	if ProjectSettings.has_setting("lumarush/powerup_shuffle_charges"):
+		return max(0, int(ProjectSettings.get_setting("lumarush/powerup_shuffle_charges")))
+	return POWERUP_SHUFFLE_CHARGES
+
+static func powerup_flash_alpha() -> float:
+	if ProjectSettings.has_setting("lumarush/powerup_flash_alpha"):
+		return clamp(float(ProjectSettings.get_setting("lumarush/powerup_flash_alpha")), 0.0, 1.0)
+	return POWERUP_FLASH_ALPHA
+
+static func powerup_flash_seconds() -> float:
+	if ProjectSettings.has_setting("lumarush/powerup_flash_seconds"):
+		return max(0.05, float(ProjectSettings.get_setting("lumarush/powerup_flash_seconds")))
+	return POWERUP_FLASH_SECONDS

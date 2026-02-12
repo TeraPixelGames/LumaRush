@@ -21,6 +21,7 @@ func _update_labels() -> void:
 	streak_label.text = "Streak: %d" % StreakManager.get_streak_days()
 
 func _on_play_again_pressed() -> void:
+	AdManager.maybe_show_interstitial()
 	RunManager.start_game()
 
 func _on_menu_pressed() -> void:

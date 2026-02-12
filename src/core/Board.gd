@@ -96,6 +96,45 @@ func resolve_move(start: Vector2i) -> Array:
 	_refill()
 	return group
 
+func snapshot() -> Array:
+	return grid.duplicate(true)
+
+func restore(snapshot_grid: Array) -> void:
+	grid = snapshot_grid.duplicate(true)
+
+func shuffle_tiles() -> void:
+	var values: Array = []
+	for y in range(height):
+		for x in range(width):
+			values.append(grid[y][x])
+	for i in range(values.size() - 1, 0, -1):
+		var j: int = rng.randi_range(0, i)
+		var tmp: Variant = values[i]
+		values[i] = values[j]
+		values[j] = tmp
+	var idx: int = 0
+	for row in range(height):
+		for col in range(width):
+			grid[row][col] = values[idx]
+			idx += 1
+	if not has_move():
+		ensure_min_available_matches(1, 80)
+
+func remove_color(color_idx: int) -> int:
+	var removed: int = 0
+	for y in range(height):
+		for x in range(width):
+			if int(grid[y][x]) == color_idx:
+				grid[y][x] = null
+				removed += 1
+	if removed <= 0:
+		return 0
+	_apply_gravity()
+	_refill()
+	if not has_move():
+		ensure_min_available_matches(1, 80)
+	return removed
+
 func count_available_matches() -> int:
 	var visited := {}
 	var count: int = 0

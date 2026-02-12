@@ -68,3 +68,25 @@ func test_ensure_min_available_matches_hits_target() -> void:
 	var count: int = b.ensure_min_available_matches(3, 300)
 	assert_that(count).is_greater_equal(3)
 	assert_that(b.count_available_matches()).is_greater_equal(3)
+
+func test_shuffle_tiles_keeps_board_playable() -> void:
+	var b := Board.new(5, 5, 4, 11, 3)
+	var before: Array = b.snapshot()
+	b.shuffle_tiles()
+	assert_that(b.has_move()).is_true()
+	assert_that(b.snapshot()).is_not_equal(before)
+
+func test_remove_color_refills_and_preserves_moves() -> void:
+	var b := Board.new(4, 4, 3, 21, 3)
+	b.grid = [
+		[0, 0, 1, 2],
+		[1, 0, 2, 2],
+		[2, 1, 2, 1],
+		[0, 2, 1, 0],
+	]
+	var removed: int = b.remove_color(2)
+	assert_that(removed).is_greater(0)
+	for y in range(b.height):
+		for x in range(b.width):
+			assert_that(b.grid[y][x]).is_not_null()
+	assert_that(b.has_move()).is_true()
