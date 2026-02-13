@@ -1,6 +1,9 @@
 extends Node
 
 const REFERENCE_HEIGHT: float = 2532.0
+const GLOBAL_TEXT_SCALE: float = 2.12
+const MIN_SCALE_FACTOR: float = 0.90
+const MAX_SCALE_FACTOR: float = 2.30
 const PRIMARY_TEXT: Color = Color8(242, 244, 255, 255)
 const SECONDARY_TEXT: Color = Color8(242, 244, 255, 166)
 const SHADOW_TEXT: Color = Color(0.02, 0.04, 0.12, 0.82)
@@ -26,10 +29,10 @@ func scale_factor() -> float:
 	var h: float = tree.root.get_visible_rect().size.y
 	if h <= 0.0:
 		return 1.0
-	return clamp(h / REFERENCE_HEIGHT, 0.75, 1.35)
+	return clamp(h / REFERENCE_HEIGHT, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR)
 
 func px(reference_size: float) -> int:
-	return int(round(reference_size * scale_factor()))
+	return int(round(reference_size * scale_factor() * GLOBAL_TEXT_SCALE))
 
 func _font_for_weight(weight: int) -> Font:
 	if _font_cache.has(weight):
@@ -64,10 +67,10 @@ func style_button(button: BaseButton, reference_size: float, weight: int = WEIGH
 func style_main_menu(scene: Control) -> void:
 	style_label(scene.get_node_or_null("UI/VBox/Title"), SIZE_MENU_TITLE, WEIGHT_BOLD)
 	style_label(scene.get_node_or_null("UI/VBox/Subtitle"), SIZE_BODY, WEIGHT_REGULAR, true)
-	style_label(scene.get_node_or_null("UI/VBox/TrackLabel"), SIZE_BODY, WEIGHT_MEDIUM, true)
-	style_button(scene.get_node_or_null("UI/VBox/TrackCarousel/TrackPrev"), 34.0, WEIGHT_BOLD)
-	style_label(scene.get_node_or_null("UI/VBox/TrackCarousel/TrackNameHost/TrackName"), 30.0, WEIGHT_SEMIBOLD)
-	style_button(scene.get_node_or_null("UI/VBox/TrackCarousel/TrackNext"), 34.0, WEIGHT_BOLD)
+	style_label(scene.get_node_or_null("UI/VBox/TrackLabel"), 22.0, WEIGHT_MEDIUM, true)
+	style_button(scene.get_node_or_null("UI/VBox/TrackCarousel/TrackPrev"), 26.0, WEIGHT_BOLD)
+	style_label(scene.get_node_or_null("UI/VBox/TrackCarousel/TrackNameHost/TrackName"), 24.0, WEIGHT_SEMIBOLD)
+	style_button(scene.get_node_or_null("UI/VBox/TrackCarousel/TrackNext"), 26.0, WEIGHT_BOLD)
 	style_button(scene.get_node_or_null("UI/VBox/Start"), SIZE_BUTTON, WEIGHT_SEMIBOLD)
 
 func style_game(scene: Control) -> void:

@@ -10,7 +10,7 @@ signal match_haptic_triggered(duration_ms: int, amplitude: float)
 @export var width := 8
 @export var height := 10
 @export var colors := 5
-@export var tile_size := 96.0
+@export var tile_size := 100.0
 
 const TILE_PALETTE_MODERN := [
 	Color(0.18, 0.78, 1.0, 0.78),  # cyan
@@ -39,6 +39,7 @@ var _hint_group: Array = []
 var _tile_gap_px: float = 8.0
 
 func _ready() -> void:
+	_tile_gap_px = _gap_for_tile_size(tile_size)
 	var board_seed: int = 1234 if FeatureFlags.is_visual_test_mode() else -1
 	_min_match_size = FeatureFlags.min_match_size()
 	colors = _palette_size()
@@ -51,6 +52,19 @@ func _ready() -> void:
 	queue_redraw()
 	_setup_hint_timer()
 	_check_no_moves_and_emit()
+
+func set_tile_size(new_size: float) -> void:
+	var target: float = max(72.0, new_size)
+	if absf(target - tile_size) < 0.1:
+		return
+	tile_size = target
+	_tile_gap_px = _gap_for_tile_size(tile_size)
+	if board == null:
+		return
+	_rebuild_tiles_from_grid()
+
+func _gap_for_tile_size(size: float) -> float:
+	return clamp(size * 0.08, 7.0, 11.0)
 
 func _create_tiles() -> void:
 	tiles.clear()

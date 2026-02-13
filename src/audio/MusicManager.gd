@@ -34,6 +34,7 @@ var _current_track_id: String = ""
 var _friendly_names := {
 	"default": "Luma Theme",
 	"glassgrid": "Neon Drift",
+	"chrome": "Chrome Surge",
 	"off": "Off",
 }
 

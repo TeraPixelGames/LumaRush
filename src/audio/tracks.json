@@ -14,5 +14,13 @@
     "bass": "res://assets/stems/glassgrid/hype_layer.ogg",
     "drums": "res://assets/stems/glassgrid/match_layer.ogg",
     "fx": "res://assets/stems/glassgrid/fx_layer.ogg"
+  },
+  {
+    "id": "chrome",
+    "bpm": 95,
+    "synth": "res://assets/stems/chrome/synth_layer.ogg",
+    "bass": "res://assets/stems/chrome/bass_layer.ogg",
+    "drums": "res://assets/stems/chrome/drum_layer.ogg",
+    "fx": "res://assets/stems/chrome/fx_layer.ogg"
   }
 ]

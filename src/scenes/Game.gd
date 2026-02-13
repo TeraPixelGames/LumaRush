@@ -1,6 +1,8 @@
 extends Control
 
 @onready var board: BoardView = $BoardView
+@onready var top_bar: Control = $UI/TopBar
+@onready var powerups_row: Control = $UI/Powerups
 @onready var score_value_label: Label = $UI/TopBar/ScoreBox/ScoreValue
 @onready var undo_button: Button = $UI/Powerups/Undo
 @onready var remove_color_button: Button = $UI/Powerups/RemoveColor
@@ -362,5 +364,21 @@ func _center_board() -> void:
 	if board == null:
 		return
 	var view_size: Vector2 = get_viewport_rect().size
+	var horizontal_padding: float = max(28.0, view_size.x * 0.06)
+	var top_limit: float = view_size.y * 0.14
+	if top_bar and top_bar.size.y > 0.0:
+		top_limit = top_bar.position.y + top_bar.size.y + 30.0
+	var bottom_limit: float = view_size.y * 0.81
+	if powerups_row and powerups_row.size.y > 0.0:
+		bottom_limit = powerups_row.position.y - 30.0
+	var available_width: float = max(320.0, view_size.x - (horizontal_padding * 2.0))
+	var available_height: float = max(420.0, bottom_limit - top_limit)
+	var fit_w: float = floor(available_width / float(board.width))
+	var fit_h: float = floor(available_height / float(board.height))
+	var target_tile_size: float = clamp(min(fit_w, fit_h), 100.0, 116.0)
+	board.set_tile_size(target_tile_size)
 	var board_size: Vector2 = Vector2(board.width * board.tile_size, board.height * board.tile_size)
-	board.position = (view_size - board_size) * 0.5
+	board.position = Vector2(
+		(view_size.x - board_size.x) * 0.5,
+		top_limit + ((available_height - board_size.y) * 0.5)
+	)
