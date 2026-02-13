@@ -32,7 +32,8 @@ void fragment() {
 	float radius = corner_radius;
 	float sdf = rounded_rect_sdf(p, vec2(0.5 - border), radius);
 	float inside = 1.0 - smoothstep(0.0, 0.006, sdf);
-	float edge = 1.0 - smoothstep(-0.02, 0.01, sdf);
+	// Edge highlight should only exist near the border, not across the full tile.
+	float edge = (1.0 - smoothstep(0.0, 0.03, abs(sdf))) * inside;
 	float inner_edge = smoothstep(-0.08, -0.01, sdf) * inside;
 
 	// Keep tile hue anchored to logical tint color while still borrowing

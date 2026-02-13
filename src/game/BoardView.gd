@@ -43,7 +43,7 @@ func _ready() -> void:
 	var board_seed: int = 1234 if FeatureFlags.is_visual_test_mode() else -1
 	_min_match_size = FeatureFlags.min_match_size()
 	colors = _palette_size()
-	board = Board.new(width, height, colors, board_seed, _min_match_size)
+	board = Board.new(width, height, colors, board_seed, _min_match_size, _palette_size())
 	_normalize_board_color_ids()
 	var required_matches: int = int(ceil(FeatureFlags.gameplay_matches_normalizer()))
 	board.ensure_min_available_matches(required_matches)
@@ -163,7 +163,7 @@ func apply_remove_color_powerup(color_idx: int = -1) -> Dictionary:
 		fade.tween_property(tile, "scale", Vector2(1.25, 1.25), 0.14)
 		fade.tween_property(tile, "modulate:a", 0.0, 0.18)
 	await fade.finished
-	var removed: int = board.remove_color(target_color)
+	var removed: int = board.remove_color(target_color, _palette_size())
 	_normalize_board_color_ids()
 	_rebuild_tiles_from_grid()
 	await _animate_powerup_release()
@@ -375,9 +375,10 @@ func _clear_hint() -> void:
 
 func _best_removal_color() -> int:
 	var counts: Dictionary = {}
+	var mod_count: int = _palette_size()
 	for y in range(height):
 		for x in range(width):
-			var c: int = int(board.grid[y][x])
+			var c: int = posmod(int(board.grid[y][x]), mod_count)
 			counts[c] = int(counts.get(c, 0)) + 1
 	var best_color: int = -1
 	var best_count: int = 0
@@ -390,9 +391,10 @@ func _best_removal_color() -> int:
 
 func _positions_for_color(color_idx: int) -> Array:
 	var out: Array = []
+	var target_idx: int = posmod(color_idx, _palette_size())
 	for y in range(height):
 		for x in range(width):
-			if int(board.grid[y][x]) == color_idx:
+			if posmod(int(board.grid[y][x]), _palette_size()) == target_idx:
 				out.append(Vector2i(x, y))
 	return out
 
@@ -428,6 +430,7 @@ func _normalize_board_color_ids() -> void:
 	if board == null or board.grid.is_empty():
 		return
 	var mod_count: int = _palette_size()
+	board.match_color_mod = mod_count
 	for y in range(height):
 		for x in range(width):
 			var value: Variant = board.grid[y][x]
