@@ -13,19 +13,19 @@ signal match_haptic_triggered(duration_ms: int, amplitude: float)
 @export var tile_size := 96.0
 
 const TILE_PALETTE_MODERN := [
-	Color(0.38, 0.78, 1.0, 0.68),  # cyan-blue
-	Color(0.90, 0.52, 0.98, 0.68), # violet
-	Color(0.48, 0.94, 0.72, 0.68), # mint
-	Color(1.0, 0.78, 0.36, 0.68),  # amber
-	Color(1.0, 0.48, 0.62, 0.68),  # rose
+	Color(0.18, 0.78, 1.0, 0.78),  # cyan
+	Color(0.98, 0.34, 0.30, 0.78), # red
+	Color(0.28, 0.94, 0.46, 0.78), # green
+	Color(1.0, 0.84, 0.18, 0.78),  # yellow
+	Color(0.68, 0.42, 1.0, 0.78),  # purple
 ]
 
 const TILE_PALETTE_LEGACY := [
-	Color(0.56, 0.80, 1.0, 0.64),  # soft blue
-	Color(0.86, 0.62, 0.84, 0.64), # mauve
-	Color(0.78, 0.62, 0.92, 0.64), # lavender
-	Color(0.90, 0.62, 0.78, 0.64), # rose-peach
-	Color(0.90, 0.78, 0.66, 0.64), # warm sand
+	Color(0.62, 0.84, 1.0, 0.74),  # soft blue
+	Color(0.94, 0.56, 0.52, 0.74), # coral red
+	Color(0.58, 0.90, 0.66, 0.74), # mint green
+	Color(0.96, 0.82, 0.52, 0.74), # warm gold
+	Color(0.74, 0.62, 0.94, 0.74), # plum
 ]
 
 var board: Board
@@ -394,21 +394,21 @@ func _apply_tile_design_shader_profile(mat: ShaderMaterial) -> void:
 	if FeatureFlags.tile_design_mode() == FeatureFlags.TileDesignMode.LEGACY:
 		mat.set_shader_parameter("corner_radius", 0.06)
 		mat.set_shader_parameter("border", 0.055)
-		mat.set_shader_parameter("tint_mix", 0.84)
-		mat.set_shader_parameter("saturation_boost", 1.06)
-		mat.set_shader_parameter("bg_luma_mix", 0.42)
+		mat.set_shader_parameter("tint_mix", 0.92)
+		mat.set_shader_parameter("saturation_boost", 1.14)
+		mat.set_shader_parameter("bg_luma_mix", 0.32)
 		mat.set_shader_parameter("specular_strength", 0.24)
-		mat.set_shader_parameter("inner_shadow_strength", 0.22)
-		mat.set_shader_parameter("edge_color", Color(0.84, 0.9, 1.0, 0.28))
+		mat.set_shader_parameter("inner_shadow_strength", 0.3)
+		mat.set_shader_parameter("edge_color", Color(0.84, 0.9, 1.0, 0.4))
 	else:
 		mat.set_shader_parameter("corner_radius", 0.11)
 		mat.set_shader_parameter("border", 0.08)
-		mat.set_shader_parameter("tint_mix", 0.98)
-		mat.set_shader_parameter("saturation_boost", 1.22)
-		mat.set_shader_parameter("bg_luma_mix", 0.22)
+		mat.set_shader_parameter("tint_mix", 1.0)
+		mat.set_shader_parameter("saturation_boost", 1.3)
+		mat.set_shader_parameter("bg_luma_mix", 0.14)
 		mat.set_shader_parameter("specular_strength", 0.36)
-		mat.set_shader_parameter("inner_shadow_strength", 0.26)
-		mat.set_shader_parameter("edge_color", Color(0.88, 0.95, 1.0, 0.42))
+		mat.set_shader_parameter("inner_shadow_strength", 0.34)
+		mat.set_shader_parameter("edge_color", Color(0.88, 0.95, 1.0, 0.54))
 
 func _normalize_board_color_ids() -> void:
 	if board == null or board.grid.is_empty():
