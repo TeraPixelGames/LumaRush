@@ -108,6 +108,29 @@ func test_remove_color_powerup_removes_tiles() -> void:
 			assert_that(tile.modulate.a).is_equal(1.0)
 	view.queue_free()
 
+func test_prism_pick_mode_emits_selected_color() -> void:
+	ProjectSettings.set_setting("lumarush/min_match_size", 3)
+	var view := BoardView.new()
+	view.width = 3
+	view.height = 3
+	view.colors = 3
+	view.tile_size = 16.0
+	get_tree().root.add_child(view)
+	view.board.grid = [
+		[2, 1, 0],
+		[1, 0, 2],
+		[0, 2, 1],
+	]
+	view._refresh_tiles()
+	var selected_color: Array[int] = [-1]
+	view.connect("prism_color_selected", func(color_idx: int) -> void:
+		selected_color[0] = color_idx
+	)
+	view.set_prism_pick_mode(true)
+	view._handle_click(Vector2(8, 8))
+	assert_that(selected_color[0]).is_equal(2)
+	view.queue_free()
+
 func test_board_view_normalizes_to_palette_and_matches_exact_color() -> void:
 	ProjectSettings.set_setting("lumarush/min_match_size", 3)
 	var view := BoardView.new()

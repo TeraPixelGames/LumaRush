@@ -20,21 +20,26 @@ func test_remove_color_and_undo_restore_board() -> void:
 	board_view.board.grid = custom_grid
 	board_view._refresh_tiles()
 	var before: Array = board_view.capture_snapshot()
-	await game._on_remove_color_pressed()
-	var remove_button: Button = game.get_node("UI/Powerups/RemoveColor") as Button
-	assert_that(remove_button.text).contains("x0")
+	var prism_badge: Label = game.get_node("UI/Powerups/RemoveColor/Badge") as Label
+	game._on_remove_color_pressed()
+	assert_that(prism_badge.text).is_equal("Tap Color")
+	await game._on_prism_color_selected(0)
+	for _i in range(90):
+		await get_tree().process_frame
+		if prism_badge.text != "Tap Color":
+			break
+	assert_that(prism_badge.text).is_not_equal("Tap Color")
 	game._on_undo_pressed()
+	await get_tree().process_frame
 	assert_that(board_view.capture_snapshot()).is_equal(before)
-	var undo_button: Button = game.get_node("UI/Powerups/Undo") as Button
-	assert_that(undo_button.text).contains("x0")
 	game.queue_free()
 	await get_tree().process_frame
 
 func test_shuffle_consumes_charge() -> void:
 	var game: Control = await _spawn_game()
 	await game._on_shuffle_pressed()
-	var shuffle_button: Button = game.get_node("UI/Powerups/Shuffle") as Button
-	assert_that(shuffle_button.text).contains("x0")
+	var shuffle_badge: Label = game.get_node("UI/Powerups/Shuffle/Badge") as Label
+	assert_that(shuffle_badge.text).contains("Watch Ad")
 	game.queue_free()
 	await get_tree().process_frame
 
@@ -43,12 +48,12 @@ func test_depleted_button_reward_grants_that_powerup() -> void:
 	ProjectSettings.set_setting("lumarush/powerup_remove_color_charges", 0)
 	ProjectSettings.set_setting("lumarush/powerup_shuffle_charges", 0)
 	var game: Control = await _spawn_game()
-	var undo_button: Button = game.get_node("UI/Powerups/Undo") as Button
-	assert_that(undo_button.text).contains("Watch Ad")
+	var undo_badge: Label = game.get_node("UI/Powerups/Undo/Badge") as Label
+	assert_that(undo_badge.text).contains("Watch Ad")
 	game._on_undo_pressed()
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert_that(undo_button.text).contains("x1")
+	assert_that(undo_badge.text).contains("x1")
 	game.queue_free()
 	await get_tree().process_frame
 

@@ -98,7 +98,8 @@ func style_pause_overlay(scene: Control) -> void:
 	style_button(scene.get_node_or_null("VBox/Quit"), SIZE_BUTTON, WEIGHT_SEMIBOLD)
 
 func style_save_streak(scene: Control) -> void:
-	style_label(scene.get_node_or_null("Panel/VBox/Title"), 56.0, WEIGHT_BOLD)
-	style_label(scene.get_node_or_null("Panel/VBox/Status"), 30.0, WEIGHT_REGULAR, true)
-	style_button(scene.get_node_or_null("Panel/VBox/SaveButton"), SIZE_BUTTON, WEIGHT_SEMIBOLD)
-	style_button(scene.get_node_or_null("Panel/VBox/Close"), SIZE_BUTTON, WEIGHT_MEDIUM)
+	# Keep this modal compact so text/buttons stay inside the panel on narrow screens.
+	style_label(scene.get_node_or_null("Panel/VBox/Title"), 26.0, WEIGHT_BOLD)
+	style_label(scene.get_node_or_null("Panel/VBox/Status"), 16.0, WEIGHT_REGULAR, true)
+	style_button(scene.get_node_or_null("Panel/VBox/SaveButton"), 18.0, WEIGHT_SEMIBOLD)
+	style_button(scene.get_node_or_null("Panel/VBox/Close"), 18.0, WEIGHT_MEDIUM)

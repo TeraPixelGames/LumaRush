@@ -6,10 +6,14 @@ extends Control
 var _rewarded_success := false
 
 func _ready() -> void:
-	process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	# This modal is shown on Results while the tree is not paused.
+	# Keep it interactive in both paused and unpaused states.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	Typography.style_save_streak(self)
-	AdManager.connect("rewarded_earned", Callable(self, "_on_rewarded_earned"))
-	AdManager.connect("rewarded_closed", Callable(self, "_on_rewarded_closed"))
+	if not AdManager.is_connected("rewarded_earned", Callable(self, "_on_rewarded_earned")):
+		AdManager.connect("rewarded_earned", Callable(self, "_on_rewarded_earned"))
+	if not AdManager.is_connected("rewarded_closed", Callable(self, "_on_rewarded_closed")):
+		AdManager.connect("rewarded_closed", Callable(self, "_on_rewarded_closed"))
 
 func _notification(what: int) -> void:
 	if what == Control.NOTIFICATION_RESIZED:

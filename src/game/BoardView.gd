@@ -6,6 +6,7 @@ signal no_moves
 signal move_committed(group: Array, snapshot: Array)
 signal match_click_haptic_triggered(duration_ms: int, amplitude: float)
 signal match_haptic_triggered(duration_ms: int, amplitude: float)
+signal prism_color_selected(color_idx: int)
 
 @export var width := 8
 @export var height := 10
@@ -37,6 +38,7 @@ var _hint_timer: Timer
 var _hint_tween: Tween
 var _hint_group: Array = []
 var _tile_gap_px: float = 8.0
+var _prism_pick_mode: bool = false
 
 func _ready() -> void:
 	_tile_gap_px = _gap_for_tile_size(tile_size)
@@ -63,6 +65,20 @@ func set_tile_size(new_size: float) -> void:
 		return
 	_rebuild_tiles_from_grid()
 
+func set_prism_pick_mode(enabled: bool) -> void:
+	_prism_pick_mode = enabled
+	if board == null:
+		return
+	if _prism_pick_mode:
+		_clear_hint()
+		if _hint_timer:
+			_hint_timer.stop()
+	elif _check_no_moves_and_emit():
+		_restart_hint_timer()
+
+func is_prism_pick_mode() -> bool:
+	return _prism_pick_mode
+
 func _gap_for_tile_size(size: float) -> float:
 	return clamp(size * 0.08, 7.0, 11.0)
 
@@ -88,6 +104,13 @@ func _handle_click(pos: Vector2) -> void:
 	var x: int = cell.x
 	var y: int = cell.y
 	if x < 0 or x >= width or y < 0 or y >= height:
+		return
+	if _prism_pick_mode:
+		var tile_color: Variant = board.get_tile(Vector2i(x, y))
+		if tile_color == null:
+			return
+		_trigger_match_click_haptic()
+		emit_signal("prism_color_selected", posmod(int(tile_color), _palette_size()))
 		return
 	if not _check_no_moves_and_emit():
 		return
@@ -310,6 +333,8 @@ func _restart_hint_timer() -> void:
 	_hint_timer.start()
 
 func _on_hint_timeout() -> void:
+	if _prism_pick_mode:
+		return
 	if _animating or _game_over_emitted:
 		if _animating:
 			_restart_hint_timer()

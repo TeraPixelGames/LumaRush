@@ -24,11 +24,13 @@ var _remove_color_charges: int = 0
 var _shuffle_charges: int = 0
 var _undo_stack: Array[Dictionary] = []
 var _pending_powerup_refill_type: String = ""
+var _prism_selecting: bool = false
 
-const ICON_UNDO := "↶"
-const ICON_PRISM := "◈"
-const ICON_SHUFFLE := "⤮"
-const ICON_LOADING := "…"
+const ICON_UNDO := "\u21BA"
+const ICON_PRISM := "\u25C6"
+const ICON_SHUFFLE := "\u21C4"
+const ICON_CANCEL := "\u2715"
+const ICON_LOADING := "..."
 
 func _ready() -> void:
 	var stale_overlay: Node = get_node_or_null("RunEndOverlay")
@@ -49,6 +51,8 @@ func _ready() -> void:
 	board.connect("match_made", Callable(self, "_on_match_made"))
 	board.connect("move_committed", Callable(self, "_on_move_committed"))
 	board.connect("no_moves", Callable(self, "_on_no_moves"))
+	if not board.is_connected("prism_color_selected", Callable(self, "_on_prism_color_selected")):
+		board.connect("prism_color_selected", Callable(self, "_on_prism_color_selected"))
 	if not AdManager.is_connected("rewarded_powerup_earned", Callable(self, "_on_powerup_rewarded_earned")):
 		AdManager.connect("rewarded_powerup_earned", Callable(self, "_on_powerup_rewarded_earned"))
 	if not AdManager.is_connected("rewarded_closed", Callable(self, "_on_powerup_rewarded_closed")):
@@ -64,6 +68,9 @@ func _ready() -> void:
 		badge.add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1.0))
 		badge.add_theme_color_override("font_outline_color", Color(0.1, 0.18, 0.36, 0.95))
 		badge.add_theme_constant_override("outline_size", 3)
+	undo_button.tooltip_text = "Undo"
+	remove_color_button.tooltip_text = "Prism"
+	shuffle_button.tooltip_text = "Shuffle"
 	powerup_flash.visible = false
 	_update_score()
 	_update_powerup_buttons()
@@ -94,6 +101,8 @@ func _update_score() -> void:
 	score_value_label.text = "%d" % score
 
 func _on_pause_pressed() -> void:
+	_set_prism_selection(false)
+	_update_powerup_buttons()
 	var pause := preload("res://src/scenes/PauseOverlay.tscn").instantiate()
 	add_child(pause)
 	pause.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
@@ -109,6 +118,8 @@ func _on_quit() -> void:
 	_finish_run()
 
 func _on_undo_pressed() -> void:
+	if _prism_selecting:
+		return
 	if _undo_charges <= 0:
 		_request_powerup_refill("undo")
 		return
@@ -127,17 +138,32 @@ func _on_undo_pressed() -> void:
 	_play_powerup_juice(Color(0.72, 0.9, 1.0, FeatureFlags.powerup_flash_alpha()))
 
 func _on_remove_color_pressed() -> void:
+	if _prism_selecting:
+		_set_prism_selection(false)
+		_update_powerup_buttons()
+		return
 	if _remove_color_charges <= 0:
 		_request_powerup_refill("prism")
 		return
 	if _ending_transition_started:
 		return
+	_set_prism_selection(true)
+	_update_powerup_buttons()
+
+func _on_prism_color_selected(color_idx: int) -> void:
+	if not _prism_selecting:
+		return
+	_set_prism_selection(false)
+	if _ending_transition_started or _remove_color_charges <= 0:
+		_update_powerup_buttons()
+		return
 	var snapshot: Array = board.capture_snapshot()
 	var score_before: int = score
 	var combo_before: int = combo
-	var result: Dictionary = await board.apply_remove_color_powerup()
+	var result: Dictionary = await board.apply_remove_color_powerup(color_idx)
 	var removed: int = int(result.get("removed", 0))
 	if removed <= 0:
+		_update_powerup_buttons()
 		return
 	_push_undo(snapshot, score_before, combo_before)
 	_remove_color_charges -= 1
@@ -150,6 +176,8 @@ func _on_remove_color_pressed() -> void:
 	_play_powerup_juice(Color(1.0, 0.92, 0.7, FeatureFlags.powerup_flash_alpha()))
 
 func _on_shuffle_pressed() -> void:
+	if _prism_selecting:
+		return
 	if _shuffle_charges <= 0:
 		_request_powerup_refill("shuffle")
 		return
@@ -180,15 +208,17 @@ func _update_gameplay_mood_from_matches(fade_seconds: float = -1.0) -> void:
 	BackgroundMood.set_mood_mix(calm_weight, fade)
 
 func _update_powerup_buttons() -> void:
-	undo_button.text = _powerup_button_icon(ICON_UNDO, _undo_charges, "undo")
-	remove_color_button.text = _powerup_button_icon(ICON_PRISM, _remove_color_charges, "prism")
-	shuffle_button.text = _powerup_button_icon(ICON_SHUFFLE, _shuffle_charges, "shuffle")
+	undo_button.text = _powerup_button_icon(ICON_UNDO, "undo")
+	remove_color_button.text = _powerup_button_icon(ICON_PRISM, "prism")
+	shuffle_button.text = _powerup_button_icon(ICON_SHUFFLE, "shuffle")
+	remove_color_button.tooltip_text = "Tap a tile color to clear it" if _prism_selecting else "Prism"
 	_update_badge(undo_badge, _undo_charges, _pending_powerup_refill_type == "undo")
-	_update_badge(prism_badge, _remove_color_charges, _pending_powerup_refill_type == "prism")
+	var prism_hint: String = "Tap Color" if _prism_selecting else ""
+	_update_badge(prism_badge, _remove_color_charges, _pending_powerup_refill_type == "prism", prism_hint)
 	_update_badge(shuffle_badge, _shuffle_charges, _pending_powerup_refill_type == "shuffle")
-	undo_button.disabled = (_undo_charges > 0 and _undo_stack.is_empty()) or _is_other_refill_pending("undo")
+	undo_button.disabled = (_undo_charges > 0 and _undo_stack.is_empty()) or _is_other_refill_pending("undo") or _prism_selecting
 	remove_color_button.disabled = _is_other_refill_pending("prism")
-	shuffle_button.disabled = _is_other_refill_pending("shuffle")
+	shuffle_button.disabled = _is_other_refill_pending("shuffle") or _prism_selecting
 
 func _push_undo(snapshot: Array, score_snapshot: int, combo_snapshot: int) -> void:
 	_undo_stack.append({
@@ -252,6 +282,7 @@ func _on_powerup_rewarded_closed() -> void:
 func _request_powerup_refill(powerup_type: String) -> void:
 	if _ending_transition_started:
 		return
+	_set_prism_selection(false)
 	if not _pending_powerup_refill_type.is_empty():
 		return
 	_pending_powerup_refill_type = powerup_type
@@ -260,16 +291,22 @@ func _request_powerup_refill(powerup_type: String) -> void:
 		_pending_powerup_refill_type = ""
 		_update_powerup_buttons()
 
-func _powerup_button_icon(base_icon: String, charges: int, powerup_type: String) -> String:
+func _powerup_button_icon(base_icon: String, powerup_type: String) -> String:
+	if _prism_selecting and powerup_type == "prism":
+		return ICON_CANCEL
 	if _pending_powerup_refill_type == powerup_type:
 		return ICON_LOADING
 	return base_icon
 
-func _update_badge(label: Label, charges: int, is_loading: bool) -> void:
+func _update_badge(label: Label, charges: int, is_loading: bool, custom_text: String = "") -> void:
 	if label == null:
 		return
 	label.visible = true
-	if is_loading:
+	if not custom_text.is_empty():
+		label.text = custom_text
+		label.modulate = Color(0.98, 0.99, 1.0, 0.98)
+		_set_badge_centered(label)
+	elif is_loading:
 		label.text = "Loading..."
 		label.modulate = Color(0.78, 0.86, 1.0, 0.94)
 		_set_badge_centered(label)
@@ -305,6 +342,11 @@ func _set_badge_centered(label: Label) -> void:
 func _is_other_refill_pending(powerup_type: String) -> bool:
 	return not _pending_powerup_refill_type.is_empty() and _pending_powerup_refill_type != powerup_type
 
+func _set_prism_selection(enabled: bool) -> void:
+	_prism_selecting = enabled and _remove_color_charges > 0 and not _ending_transition_started
+	if board:
+		board.set_prism_pick_mode(_prism_selecting)
+
 func _on_no_moves() -> void:
 	_finish_run()
 
@@ -315,6 +357,7 @@ func _finish_run() -> void:
 		return
 	get_tree().paused = false
 	_ending_transition_started = true
+	_set_prism_selection(false)
 	await _play_end_transition()
 	_run_finished = true
 	RunManager.end_game(score)
