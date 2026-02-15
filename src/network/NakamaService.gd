@@ -318,8 +318,16 @@ func _request_json(method: int, path: String, body: String, headers: PackedStrin
 	return {"ok": true, "code": status_code, "data": parsed, "body": text}
 
 func _read_runtime_settings() -> void:
-	_base_url = str(_project_setting("lumarush/nakama_base_url", DEFAULT_BASE_URL))
-	_server_key = str(_project_setting("lumarush/nakama_server_key", DEFAULT_SERVER_KEY))
+	_base_url = _env_or_setting_string(
+		"LUMARUSH_NAKAMA_BASE_URL",
+		"lumarush/nakama_base_url",
+		DEFAULT_BASE_URL
+	)
+	_server_key = _env_or_setting_string(
+		"LUMARUSH_NAKAMA_SERVER_KEY",
+		"lumarush/nakama_server_key",
+		DEFAULT_SERVER_KEY
+	)
 	_leaderboard_limit = int(_project_setting("lumarush/nakama_leaderboard_limit", DEFAULT_LEADERBOARD_LIMIT))
 	_connect_enabled = bool(_project_setting("lumarush/nakama_enable_client", true))
 	_base_url = _base_url.strip_edges()
@@ -327,10 +335,27 @@ func _read_runtime_settings() -> void:
 		_base_url = DEFAULT_BASE_URL
 	if _leaderboard_limit <= 0:
 		_leaderboard_limit = DEFAULT_LEADERBOARD_LIMIT
-	var configured_tpx_user_id: String = str(_project_setting("lumarush/terapixel_user_id", ""))
-	var configured_tpx_name: String = str(_project_setting("lumarush/terapixel_display_name", ""))
+	var configured_tpx_user_id: String = _env_or_setting_string(
+		"LUMARUSH_TERAPIXEL_USER_ID",
+		"lumarush/terapixel_user_id",
+		""
+	)
+	var configured_tpx_name: String = _env_or_setting_string(
+		"LUMARUSH_TERAPIXEL_DISPLAY_NAME",
+		"lumarush/terapixel_display_name",
+		""
+	)
 	if SaveStore.get_terapixel_user_id().is_empty() and not configured_tpx_user_id.is_empty():
 		SaveStore.set_terapixel_identity(configured_tpx_user_id, configured_tpx_name)
+
+func _env_or_setting_string(env_key: String, setting_key: String, fallback: String) -> String:
+	var from_env: String = OS.get_environment(env_key).strip_edges()
+	if not from_env.is_empty():
+		return from_env
+	var from_setting: String = str(_project_setting(setting_key, fallback)).strip_edges()
+	if not from_setting.is_empty():
+		return from_setting
+	return fallback
 
 func _resolve_display_name() -> String:
 	var from_store: String = SaveStore.get_terapixel_display_name()

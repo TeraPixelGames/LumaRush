@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -24,13 +24,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Godot Headless + Export Templates
         shell: bash
         run: |
           set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y unzip wget
+          sudo apt-get install -y unzip wget zip
 
           GODOT_BASE="Godot_v${GODOT_VERSION}-${GODOT_STATUS}"
           HEADLESS_ZIP="${GODOT_BASE}_linux.x86_64.zip"
@@ -90,6 +92,40 @@ jobs:
         run: |
           mkdir -p build/web
           $GODOT_BIN --headless --path . --export-release "Web" build/web/index.html
+
+      - name: Compute Next Semantic Version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_tag="$(git tag -l 'v*' --sort=-version:refname | head -n 1)"
+          if [ -z "$latest_tag" ]; then
+            next_version="0.0.1"
+          else
+            current="${latest_tag#v}"
+            IFS='.' read -r major minor patch <<< "$current"
+            major="${major:-0}"
+            minor="${minor:-0}"
+            patch="${patch:-0}"
+            patch=$((patch + 1))
+            next_version="${major}.${minor}.${patch}"
+          fi
+          echo "version=$next_version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$next_version" >> "$GITHUB_OUTPUT"
+
+      - name: Package Web Build Zip
+        shell: bash
+        run: |
+          set -euxo pipefail
+          zip -r "lumarush-web-${{ steps.version.outputs.version }}.zip" build/web
+
+      - name: Create GitHub Release With Build
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: LumaRush ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          files: lumarush-web-${{ steps.version.outputs.version }}.zip
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3

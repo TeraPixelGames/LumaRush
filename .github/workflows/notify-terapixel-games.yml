@@ -1,18 +1,14 @@
 name: Notify terapixel.games
 
 on:
-  push:
-    branches: ["main"]
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
-      ref:
-        description: "LumaRush ref to sync"
+      release_tag:
+        description: "LumaRush release tag to sync (for example: v1.2.3)"
         required: false
-        default: "main"
-      build_dir:
-        description: "Build output directory in this repo"
-        required: false
-        default: "build/web"
+        default: ""
 
 permissions:
   contents: read
@@ -25,9 +21,9 @@ jobs:
         shell: bash
         env:
           DISPATCH_TOKEN: ${{ secrets.TERAPIXEL_GAMES_DISPATCH_TOKEN }}
-          INPUT_REF: ${{ inputs.ref }}
-          INPUT_BUILD_DIR: ${{ inputs.build_dir }}
-          REF_NAME: ${{ github.ref_name }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG_FROM_EVENT: ${{ github.event.release.tag_name }}
+          RELEASE_TARGET_SHA: ${{ github.event.release.target_commitish }}
           SHA: ${{ github.sha }}
         run: |
           if [ -z "$DISPATCH_TOKEN" ]; then
@@ -35,27 +31,38 @@ jobs:
             exit 1
           fi
 
-          REF="$INPUT_REF"
-          if [ -z "$REF" ]; then
-            REF="$REF_NAME"
+          RELEASE_TAG="$INPUT_RELEASE_TAG"
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG="$RELEASE_TAG_FROM_EVENT"
           fi
-          if [ -z "$REF" ]; then
-            REF="main"
+          if [ -z "$RELEASE_TAG" ]; then
+            LATEST_JSON=$(curl -sS \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $DISPATCH_TOKEN" \
+              https://api.github.com/repos/TeraPixelGames/LumaRush/releases/latest)
+            RELEASE_TAG=$(LATEST_JSON="$LATEST_JSON" python -c "import json,os; print(json.loads(os.environ.get('LATEST_JSON','{}')).get('tag_name',''))")
           fi
 
-          BUILD_DIR="$INPUT_BUILD_DIR"
-          if [ -z "$BUILD_DIR" ]; then
-            BUILD_DIR="build/web"
+          if [ -z "$RELEASE_TAG" ]; then
+            echo "Unable to resolve release tag"
+            exit 1
+          fi
+
+          VERSION="${RELEASE_TAG#v}"
+          RELEASE_ASSET="lumarush-web-${VERSION}.zip"
+          SOURCE_SHA="$RELEASE_TARGET_SHA"
+          if [ -z "$SOURCE_SHA" ]; then
+            SOURCE_SHA="$SHA"
           fi
 
           PAYLOAD=$(cat <<JSON
           {
             "event_type": "lumarush_main_updated",
             "client_payload": {
-              "ref": "$REF",
-              "build_dir": "$BUILD_DIR",
-              "source_repo": "TeraPixel/LumaRush",
-              "source_sha": "$SHA"
+              "release_tag": "$RELEASE_TAG",
+              "release_asset": "$RELEASE_ASSET",
+              "source_repo": "TeraPixelGames/LumaRush",
+              "source_sha": "$SOURCE_SHA"
             }
           }
           JSON
