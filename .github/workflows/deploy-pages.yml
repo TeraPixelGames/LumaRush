@@ -55,6 +55,19 @@ jobs:
           sed -i 's/^enabled=PackedStringArray(.*/enabled=PackedStringArray()/g' project.godot
           grep -n "^\[editor_plugins\]\|^enabled=" project.godot
 
+      - name: Inject Nakama Server Key For Web Build
+        shell: bash
+        env:
+          NAKAMA_SERVER_KEY: ${{ secrets.NAKAMA_SERVER_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NAKAMA_SERVER_KEY:-}" ]; then
+            echo "Missing required GitHub secret: NAKAMA_SERVER_KEY"
+            exit 1
+          fi
+          sed -i "s|^nakama_server_key=.*$|nakama_server_key=\"${NAKAMA_SERVER_KEY}\"|g" project.godot
+          grep -n "^nakama_server_key=" project.godot | sed 's|=.*$|=\"***\"|'
+
       - name: Disable Ad Plugins For Web CI
         shell: bash
         run: |

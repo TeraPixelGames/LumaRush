@@ -4,6 +4,7 @@ signal online_state_changed(status: String)
 signal auth_state_changed(is_authenticated: bool, user_id: String)
 signal high_score_updated(record: Dictionary)
 signal leaderboard_updated(records: Array)
+signal profile_upgraded(success: bool, message: String)
 
 const DEFAULT_BASE_URL := "http://127.0.0.1:7350"
 const DEFAULT_SERVER_KEY := "lumarush-dev-key"
@@ -47,8 +48,69 @@ func get_leaderboard_records() -> Array:
 func get_is_authenticated() -> bool:
 	return _is_authenticated
 
+func is_guest_account() -> bool:
+	return SaveStore.get_terapixel_user_id().is_empty()
+
 func set_terapixel_identity(user_id: String, display_name: String = "") -> void:
 	SaveStore.set_terapixel_identity(user_id, display_name)
+
+func upgrade_guest_to_full_profile(terapixel_user_id: String, display_name: String = "", custom_id: String = "") -> Dictionary:
+	var tpx_user_id := terapixel_user_id.strip_edges()
+	if tpx_user_id.is_empty():
+		var bad := {"ok": false, "error": "missing terapixel_user_id"}
+		profile_upgraded.emit(false, "missing terapixel_user_id")
+		return bad
+	if not await ensure_authenticated():
+		var auth_bad := {"ok": false, "error": "auth failed"}
+		profile_upgraded.emit(false, "auth failed")
+		return auth_bad
+
+	_set_online_state("Upgrading profile...")
+	var link_id := custom_id.strip_edges()
+	if link_id.is_empty():
+		link_id = "tpx:%s" % tpx_user_id
+
+	var link_payload := {
+		"id": link_id,
+		"vars": {
+			"platform": str(_project_setting("lumarush/platform", "terapixel")),
+			"game": "lumarush",
+			"terapixel_user_id": tpx_user_id,
+		},
+	}
+	var link_result: Dictionary = await _request_json(
+		HTTPClient.METHOD_POST,
+		"/v2/account/link/custom",
+		JSON.stringify(link_payload),
+		_bearer_auth_headers()
+	)
+	if not link_result.get("ok", false):
+		_set_online_state("Connected")
+		profile_upgraded.emit(false, "link failed")
+		return link_result
+
+	var username := _sanitize_username(display_name if not display_name.is_empty() else ("Player-%s" % link_id.right(8)))
+	var update_payload := {
+		"username": username,
+		"display_name": display_name,
+	}
+	var update_result: Dictionary = await _request_json(
+		HTTPClient.METHOD_PUT,
+		"/v2/account",
+		JSON.stringify(update_payload),
+		_bearer_auth_headers()
+	)
+	if not update_result.get("ok", false):
+		_set_online_state("Connected")
+		profile_upgraded.emit(false, "profile update failed")
+		return update_result
+
+	SaveStore.set_terapixel_identity(tpx_user_id, display_name)
+	await refresh_my_high_score()
+	await refresh_leaderboard(_leaderboard_limit)
+	_set_online_state("Connected")
+	profile_upgraded.emit(true, "ok")
+	return {"ok": true, "custom_id": link_id, "username": username}
 
 func ensure_authenticated() -> bool:
 	if not _connect_enabled:
@@ -278,6 +340,25 @@ func _resolve_display_name() -> String:
 	if not from_setting.is_empty():
 		return from_setting
 	return "Player-%s" % SaveStore.get_or_create_nakama_device_id().right(6)
+
+func _sanitize_username(value: String) -> String:
+	var raw := value.strip_edges().to_lower()
+	if raw.is_empty():
+		raw = "player"
+	var out := ""
+	for i in range(raw.length()):
+		var c := raw[i]
+		var is_letter := c >= "a" and c <= "z"
+		var is_digit := c >= "0" and c <= "9"
+		if is_letter or is_digit:
+			out += c
+		elif c == "_" or c == "-":
+			out += c
+	if out.length() < 3:
+		out += "123"
+	if out.length() > 20:
+		out = out.substr(0, 20)
+	return out
 
 func _augment_metadata(metadata: Dictionary) -> Dictionary:
 	var out := metadata.duplicate(true)

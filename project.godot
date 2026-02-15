@@ -56,8 +56,8 @@ textures/vram_compression/import_etc2_astc=true
 [lumarush]
 
 nakama_enable_client=true
-nakama_base_url="http://127.0.0.1:7350"
-nakama_server_key="lumarush-dev-key"
+nakama_base_url="https://lumarush-nakama.onrender.com"
+nakama_server_key="CHANGE_ME_RENDER_SERVER_KEY"
 nakama_leaderboard_limit=10
 platform="terapixel"
 terapixel_user_id=""
