@@ -18,7 +18,7 @@ const TILE_PALETTE_MODERN := [
 	Color(0.98, 0.34, 0.30, 0.78), # red
 	Color(0.28, 0.94, 0.46, 0.78), # green
 	Color(1.0, 0.84, 0.18, 0.78),  # yellow
-	Color(0.68, 0.42, 1.0, 0.78),  # purple
+	Color(0.88, 0.34, 1.0, 0.84),  # vivid purple
 ]
 
 const TILE_PALETTE_LEGACY := [
@@ -26,7 +26,7 @@ const TILE_PALETTE_LEGACY := [
 	Color(0.94, 0.56, 0.52, 0.74), # coral red
 	Color(0.58, 0.90, 0.66, 0.74), # mint green
 	Color(0.96, 0.82, 0.52, 0.74), # warm gold
-	Color(0.74, 0.62, 0.94, 0.74), # plum
+	Color(0.86, 0.56, 0.96, 0.78), # vivid plum
 ]
 
 var board: Board
