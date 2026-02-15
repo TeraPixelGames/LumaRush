@@ -1,0 +1,26 @@
+name: "lumarush-nakama"
+logger:
+  level: "INFO"
+
+session:
+  token_expiry_sec: 7200
+  refresh_token_expiry_sec: 604800
+
+socket:
+  server_key: "lumarush-dev-key"
+  port: 7350
+
+console:
+  port: 7351
+  username: "admin"
+  password: "adminpassword"
+
+runtime:
+  path: "/nakama/data/modules"
+  js_entrypoint: "lumarush.js"
+  env:
+    - "TPX_PLATFORM_AUTH_URL="
+    - "TPX_PLATFORM_EVENT_URL="
+    - "TPX_PLATFORM_API_KEY="
+    - "TPX_HTTP_TIMEOUT_MS=5000"
+    - "LUMARUSH_LEADERBOARD_ID=lumarush_high_scores"

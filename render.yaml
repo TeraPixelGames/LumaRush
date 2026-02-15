@@ -1,0 +1,59 @@
+databases:
+  - name: lumarush-nakama-db
+    databaseName: lumarush
+    user: lumarush
+    plan: free
+
+services:
+  - type: web
+    name: lumarush-nakama
+    runtime: docker
+    plan: starter
+    dockerContext: ./backend/nakama
+    dockerfilePath: ./backend/nakama/Dockerfile.render
+    healthCheckPath: /healthcheck
+    envVars:
+      - key: PORT
+        value: "7350"
+      - key: DB_HOST
+        fromDatabase:
+          name: lumarush-nakama-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: lumarush-nakama-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: lumarush-nakama-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: lumarush-nakama-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: lumarush-nakama-db
+          property: password
+      - key: TPX_PLATFORM_AUTH_URL
+        sync: false
+      - key: TPX_PLATFORM_EVENT_URL
+        sync: false
+      - key: TPX_PLATFORM_API_KEY
+        sync: false
+      - key: TPX_HTTP_TIMEOUT_MS
+        value: "5000"
+      - key: LUMARUSH_LEADERBOARD_ID
+        value: "lumarush_high_scores"
+      - key: NAKAMA_SERVER_KEY
+        generateValue: true
+      - key: NAKAMA_SESSION_ENCRYPTION_KEY
+        generateValue: true
+      - key: NAKAMA_SESSION_REFRESH_ENCRYPTION_KEY
+        generateValue: true
+      - key: NAKAMA_RUNTIME_HTTP_KEY
+        generateValue: true
+      - key: NAKAMA_CONSOLE_USERNAME
+        value: admin
+      - key: NAKAMA_CONSOLE_PASSWORD
+        sync: false
