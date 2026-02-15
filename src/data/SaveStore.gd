@@ -10,6 +10,10 @@ var data := {
 	"streak_at_risk": 0,
 	"games_played": 0,
 	"selected_track_id": "glassgrid",
+	"nakama_device_id": "",
+	"nakama_user_id": "",
+	"terapixel_user_id": "",
+	"terapixel_display_name": "",
 }
 
 func _ready() -> void:
@@ -106,3 +110,29 @@ func set_streak_at_risk(days: int) -> void:
 func set_last_play_date(date_key: String) -> void:
 	data["last_play_date"] = date_key
 	save()
+
+func get_or_create_nakama_device_id() -> String:
+	var current: String = str(data.get("nakama_device_id", ""))
+	if not current.is_empty():
+		return current
+	var bytes: PackedByteArray = Crypto.new().generate_random_bytes(16)
+	current = "lr-%s" % bytes.hex_encode()
+	data["nakama_device_id"] = current
+	save()
+	return current
+
+func set_nakama_user_id(user_id: String) -> void:
+	data["nakama_user_id"] = user_id
+	save()
+
+func set_terapixel_identity(user_id: String, display_name: String = "") -> void:
+	data["terapixel_user_id"] = user_id
+	if not display_name.is_empty():
+		data["terapixel_display_name"] = display_name
+	save()
+
+func get_terapixel_user_id() -> String:
+	return str(data.get("terapixel_user_id", ""))
+
+func get_terapixel_display_name() -> String:
+	return str(data.get("terapixel_display_name", ""))

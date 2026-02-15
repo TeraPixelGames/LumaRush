@@ -89,6 +89,8 @@ func style_results(scene: Control) -> void:
 	style_label(scene.get_node_or_null("UI/VBox/Score"), 84.0, WEIGHT_BOLD)
 	style_label(scene.get_node_or_null("UI/VBox/Best"), 32.0, WEIGHT_MEDIUM, true)
 	style_label(scene.get_node_or_null("UI/VBox/Streak"), 32.0, WEIGHT_MEDIUM, true)
+	style_label(scene.get_node_or_null("UI/VBox/OnlineStatus"), 24.0, WEIGHT_MEDIUM, true)
+	style_label(scene.get_node_or_null("UI/VBox/Leaderboard"), 22.0, WEIGHT_REGULAR, true)
 	style_button(scene.get_node_or_null("UI/VBox/PlayAgain"), 34.0, WEIGHT_BOLD)
 	style_button(scene.get_node_or_null("UI/VBox/Menu"), 30.0, WEIGHT_SEMIBOLD)
 

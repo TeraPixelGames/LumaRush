@@ -76,6 +76,17 @@ text = "Streak: 0"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 30
 
+[node name="OnlineStatus" type="Label" parent="UI/VBox"]
+text = "Online: connecting..."
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 24
+
+[node name="Leaderboard" type="Label" parent="UI/VBox"]
+text = "Leaderboard loading..."
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 24
+autowrap_mode = 2
+
 [node name="PlayAgain" type="Button" parent="UI/VBox"]
 script = ExtResource( 5 )
 text = "Play Again"

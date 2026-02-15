@@ -26,6 +26,7 @@ VFXManager="*res://src/vfx/VFXManager.gd"
 RunManager="*res://src/core/RunManager.gd"
 SafeArea="*res://src/core/SafeArea.gd"
 Typography="*res://src/ui/Typography.gd"
+NakamaService="*res://src/network/NakamaService.gd"
 
 [debug]
 
@@ -51,3 +52,13 @@ enabled=PackedStringArray("res://addons/AdmobPlugin/plugin.cfg", "res://addons/g
 
 renderer/rendering_method="mobile"
 textures/vram_compression/import_etc2_astc=true
+
+[lumarush]
+
+nakama_enable_client=true
+nakama_base_url="http://127.0.0.1:7350"
+nakama_server_key="lumarush-dev-key"
+nakama_leaderboard_limit=10
+platform="terapixel"
+terapixel_user_id=""
+terapixel_display_name=""

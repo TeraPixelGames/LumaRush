@@ -10,7 +10,7 @@ var MODULE_CONFIG = {
 };
 
 function InitModule(ctx, logger, nk, initializer) {
-  MODULE_CONFIG = loadConfig(initializer.getConfig());
+  MODULE_CONFIG = loadConfig(ctx);
   ensureLeaderboard(nk, logger, MODULE_CONFIG.leaderboardId);
 
   initializer.registerRpc("tpx_submit_score", rpcSubmitScore);
@@ -28,19 +28,8 @@ function InitModule(ctx, logger, nk, initializer) {
   );
 }
 
-function loadConfig(config) {
-  var env = {};
-  var items = (config && config.runtime && config.runtime.env) || [];
-  for (var i = 0; i < items.length; i++) {
-    var entry = items[i];
-    var split = entry.indexOf("=");
-    if (split < 0) {
-      continue;
-    }
-    var key = entry.substring(0, split);
-    var value = entry.substring(split + 1);
-    env[key] = value;
-  }
+function loadConfig(ctx) {
+  var env = (ctx && ctx.env) || {};
 
   var timeout = toInt(env.TPX_HTTP_TIMEOUT_MS, 5000);
   if (timeout <= 0) {
@@ -61,8 +50,8 @@ function ensureLeaderboard(nk, logger, leaderboardId) {
     nk.leaderboardCreate(
       leaderboardId,
       true,
-      nkruntime.SortOrder.DESCENDING,
-      nkruntime.Operator.BEST,
+      "descending",
+      "best",
       null,
       { game: "LumaRush", platform: "terapixel" },
       true
@@ -182,7 +171,7 @@ function rpcSubmitScore(ctx, logger, nk, payload) {
     score,
     subscore,
     metadata,
-    nkruntime.OverrideOperator.BEST
+    "best"
   );
 
   writePlayerHighScore(nk, ctx.userId, record);
