@@ -12,7 +12,7 @@ on:
       build_dir:
         description: "Build output directory in this repo"
         required: false
-        default: "build/web_publish_check"
+        default: "build/web"
 
 permissions:
   contents: read
@@ -45,7 +45,7 @@ jobs:
 
           BUILD_DIR="$INPUT_BUILD_DIR"
           if [ -z "$BUILD_DIR" ]; then
-            BUILD_DIR="build/web_publish_check"
+            BUILD_DIR="build/web"
           fi
 
           PAYLOAD=$(cat <<JSON
