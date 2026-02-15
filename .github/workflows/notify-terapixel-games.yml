@@ -1,0 +1,79 @@
+name: Notify terapixel.games
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "LumaRush ref to sync"
+        required: false
+        default: "main"
+      build_dir:
+        description: "Build output directory in this repo"
+        required: false
+        default: "build/web_publish_check"
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch update event
+        shell: bash
+        env:
+          DISPATCH_TOKEN: ${{ secrets.TERAPIXEL_GAMES_DISPATCH_TOKEN }}
+          INPUT_REF: ${{ inputs.ref }}
+          INPUT_BUILD_DIR: ${{ inputs.build_dir }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$DISPATCH_TOKEN" ]; then
+            echo "Missing required secret: TERAPIXEL_GAMES_DISPATCH_TOKEN"
+            exit 1
+          fi
+
+          REF="$INPUT_REF"
+          if [ -z "$REF" ]; then
+            REF="$REF_NAME"
+          fi
+          if [ -z "$REF" ]; then
+            REF="main"
+          fi
+
+          BUILD_DIR="$INPUT_BUILD_DIR"
+          if [ -z "$BUILD_DIR" ]; then
+            BUILD_DIR="build/web_publish_check"
+          fi
+
+          PAYLOAD=$(cat <<JSON
+          {
+            "event_type": "lumarush_main_updated",
+            "client_payload": {
+              "ref": "$REF",
+              "build_dir": "$BUILD_DIR",
+              "source_repo": "TeraPixel/LumaRush",
+              "source_sha": "$SHA"
+            }
+          }
+          JSON
+          )
+
+          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $DISPATCH_TOKEN" \
+            https://api.github.com/repos/TeraPixel/terapixel.games/dispatches \
+            -d "$PAYLOAD")
+
+          echo "Dispatch HTTP status: $HTTP_CODE"
+          cat response.json || true
+
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "repository_dispatch failed"
+            exit 1
+          fi
+
+          echo "repository_dispatch sent to TeraPixel/terapixel.games"
