@@ -8,7 +8,38 @@ var SHOP_KEY = "state";
 var ACCOUNT_COLLECTION = "lumarush_player_account";
 var MAGIC_LINK_STATUS_KEY = "magic_link_status";
 var USERNAME_STATE_KEY = "username_state";
+var USERNAME_AUDIT_KEY = "username_audit";
 var DEFAULT_USERNAME_CHANGE_COST_COINS = 300;
+var DEFAULT_USERNAME_CHANGE_COOLDOWN_SECONDS = 300;
+var DEFAULT_USERNAME_CHANGE_MAX_PER_DAY = 3;
+var DEFAULT_BLOCKED_USERNAME_TOKENS = [
+  "admin",
+  "moderator",
+  "support",
+  "staff",
+  "owner",
+  "nigger",
+  "nigga",
+  "faggot",
+  "retard",
+  "rape",
+  "rapist",
+  "kike",
+  "chink",
+  "spic",
+  "whore",
+  "slut",
+  "cunt",
+  "fuck",
+  "shit",
+  "bitch",
+  "dick",
+  "penis",
+  "vagina",
+  "hitler",
+  "nazi",
+  "terrorist",
+];
 var DEFAULT_GAME_ID = "lumarush";
 var THEME_COSTS = {
   neon: 1500,
@@ -30,8 +61,14 @@ var MODULE_CONFIG = {
   accountMergeRedeemUrl: "",
   accountMagicLinkStartUrl: "",
   accountMagicLinkCompleteUrl: "",
+  usernameValidateUrl: "",
+  internalServiceKey: "",
+  usernameModerationFailOpen: false,
+  usernameChangeCooldownSeconds: DEFAULT_USERNAME_CHANGE_COOLDOWN_SECONDS,
+  usernameChangeMaxPerDay: DEFAULT_USERNAME_CHANGE_MAX_PER_DAY,
   magicLinkNotifySecret: "",
   usernameChangeCostCoins: DEFAULT_USERNAME_CHANGE_COST_COINS,
+  blockedUsernameTokens: DEFAULT_BLOCKED_USERNAME_TOKENS,
   gameId: DEFAULT_GAME_ID,
   exportTarget: "web",
   apiKey: "",
@@ -95,10 +132,25 @@ function loadConfig(ctx) {
     accountMergeRedeemUrl: env.TPX_PLATFORM_ACCOUNT_MERGE_REDEEM_URL || "",
     accountMagicLinkStartUrl: env.TPX_PLATFORM_MAGIC_LINK_START_URL || "",
     accountMagicLinkCompleteUrl: env.TPX_PLATFORM_MAGIC_LINK_COMPLETE_URL || "",
+    usernameValidateUrl: env.TPX_PLATFORM_USERNAME_VALIDATE_URL || "",
+    internalServiceKey: env.TPX_PLATFORM_INTERNAL_KEY || "",
+    usernameModerationFailOpen: toBool(env.TPX_USERNAME_MODERATION_FAIL_OPEN, false),
+    usernameChangeCooldownSeconds: toInt(
+      env.TPX_USERNAME_CHANGE_COOLDOWN_SECONDS,
+      DEFAULT_USERNAME_CHANGE_COOLDOWN_SECONDS
+    ),
+    usernameChangeMaxPerDay: toInt(
+      env.TPX_USERNAME_CHANGE_MAX_PER_DAY,
+      DEFAULT_USERNAME_CHANGE_MAX_PER_DAY
+    ),
     magicLinkNotifySecret: env.TPX_MAGIC_LINK_NOTIFY_SECRET || "",
     usernameChangeCostCoins: toInt(
       env.TPX_USERNAME_CHANGE_COST_COINS,
       DEFAULT_USERNAME_CHANGE_COST_COINS
+    ),
+    blockedUsernameTokens: parseBlockedUsernameTokens(
+      env.TPX_USERNAME_BLOCKLIST,
+      DEFAULT_BLOCKED_USERNAME_TOKENS
     ),
     gameId: env.TPX_GAME_ID || DEFAULT_GAME_ID,
     exportTarget: String(env.TPX_EXPORT_TARGET || "web").trim().toLowerCase(),
@@ -800,10 +852,29 @@ function rpcAccountUpdateUsername(ctx, logger, nk, payload) {
   if (!normalized) {
     throw new Error("username must be 3-20 characters and use letters, numbers, _ or -");
   }
-  if (containsBlockedUsernameToken(normalized)) {
+  var moderation = validateUsernameModeration(nk, logger, normalized);
+  if (!moderation.allowed) {
     throw new Error("username is not allowed");
   }
   var state = readUsernameState(nk, ctx.userId, ctx.username || "");
+  var now = Math.floor(Date.now() / 1000);
+  var cooldownSeconds = Math.max(0, toInt(MODULE_CONFIG.usernameChangeCooldownSeconds, DEFAULT_USERNAME_CHANGE_COOLDOWN_SECONDS));
+  if (cooldownSeconds > 0 && toInt(state.lastChangedAt, 0) > 0) {
+    var nextAllowedAt = toInt(state.lastChangedAt, 0) + cooldownSeconds;
+    if (nextAllowedAt > now) {
+      throw new Error("username change cooldown active");
+    }
+  }
+  var maxPerDay = Math.max(1, toInt(MODULE_CONFIG.usernameChangeMaxPerDay, DEFAULT_USERNAME_CHANGE_MAX_PER_DAY));
+  var windowStartAt = toInt(state.changeWindowStartAt, 0);
+  var windowCount = Math.max(0, toInt(state.changeWindowCount, 0));
+  if (windowStartAt <= 0 || (now - windowStartAt) >= 86400) {
+    windowStartAt = now;
+    windowCount = 0;
+  }
+  if (windowCount >= maxPerDay) {
+    throw new Error("username change daily limit reached");
+  }
   var currentNormalized = sanitizeRequestedUsername(state.currentUsername || "");
   if (normalized === currentNormalized) {
     return JSON.stringify({
@@ -860,8 +931,17 @@ function rpcAccountUpdateUsername(ctx, logger, nk, payload) {
   state.currentUsername = normalized;
   state.hasUsedFreeChange = true;
   state.changeCount = Math.max(0, toInt(state.changeCount, 0)) + 1;
-  state.lastChangedAt = Math.floor(Date.now() / 1000);
+  state.lastChangedAt = now;
+  state.changeWindowStartAt = windowStartAt;
+  state.changeWindowCount = windowCount + 1;
   writeUsernameState(nk, ctx.userId, state);
+  appendUsernameAudit(nk, ctx.userId, {
+    at: now,
+    oldUsername: currentNormalized,
+    newUsername: normalized,
+    coinCost: coinCost,
+    moderationSource: moderation.source || "unknown",
+  });
 
   return JSON.stringify({
     ok: true,
@@ -1287,6 +1367,8 @@ function readUsernameState(nk, userId, fallbackUsername) {
     hasUsedFreeChange: value ? !!value.hasUsedFreeChange : false,
     changeCount: value ? Math.max(0, toInt(value.changeCount, 0)) : 0,
     lastChangedAt: value ? Math.max(0, toInt(value.lastChangedAt, 0)) : 0,
+    changeWindowStartAt: value ? Math.max(0, toInt(value.changeWindowStartAt, 0)) : 0,
+    changeWindowCount: value ? Math.max(0, toInt(value.changeWindowCount, 0)) : 0,
   };
 }
 
@@ -1301,6 +1383,8 @@ function writeUsernameState(nk, userId, state) {
         hasUsedFreeChange: !!state.hasUsedFreeChange,
         changeCount: Math.max(0, toInt(state.changeCount, 0)),
         lastChangedAt: Math.max(0, toInt(state.lastChangedAt, 0)),
+        changeWindowStartAt: Math.max(0, toInt(state.changeWindowStartAt, 0)),
+        changeWindowCount: Math.max(0, toInt(state.changeWindowCount, 0)),
       },
       permissionRead: 0,
       permissionWrite: 0,
@@ -1316,7 +1400,49 @@ function buildUsernameStatusResponse(state) {
     nextChangeCostCoins: freeChangeAvailable ? 0 : Math.max(0, MODULE_CONFIG.usernameChangeCostCoins),
     changeCount: Math.max(0, toInt(state.changeCount, 0)),
     lastChangedAt: Math.max(0, toInt(state.lastChangedAt, 0)),
+    cooldownSeconds: Math.max(0, toInt(MODULE_CONFIG.usernameChangeCooldownSeconds, DEFAULT_USERNAME_CHANGE_COOLDOWN_SECONDS)),
+    maxChangesPerDay: Math.max(1, toInt(MODULE_CONFIG.usernameChangeMaxPerDay, DEFAULT_USERNAME_CHANGE_MAX_PER_DAY)),
   };
+}
+
+function appendUsernameAudit(nk, userId, eventRow) {
+  var current = readUsernameAudit(nk, userId);
+  current.unshift({
+    at: toInt(eventRow.at, Math.floor(Date.now() / 1000)),
+    oldUsername: String(eventRow.oldUsername || ""),
+    newUsername: String(eventRow.newUsername || ""),
+    coinCost: toInt(eventRow.coinCost, 0),
+    moderationSource: String(eventRow.moderationSource || ""),
+  });
+  if (current.length > 20) {
+    current = current.slice(0, 20);
+  }
+  nk.storageWrite([
+    {
+      collection: ACCOUNT_COLLECTION,
+      key: USERNAME_AUDIT_KEY,
+      userId: userId,
+      value: {
+        entries: current,
+      },
+      permissionRead: 0,
+      permissionWrite: 0,
+    },
+  ]);
+}
+
+function readUsernameAudit(nk, userId) {
+  var storage = nk.storageRead([
+    {
+      collection: ACCOUNT_COLLECTION,
+      key: USERNAME_AUDIT_KEY,
+      userId: userId,
+    },
+  ]);
+  if (storage && storage.length > 0 && storage[0].value && Array.isArray(storage[0].value.entries)) {
+    return storage[0].value.entries;
+  }
+  return [];
 }
 
 function sanitizeRequestedUsername(input) {
@@ -1344,45 +1470,129 @@ function sanitizeRequestedUsername(input) {
   return out;
 }
 
+function validateUsernameModeration(nk, logger, username) {
+  if (!MODULE_CONFIG.usernameValidateUrl) {
+    return {
+      allowed: !containsBlockedUsernameToken(username),
+      source: "local_fallback",
+    };
+  }
+
+  var headers = { "Content-Type": "application/json" };
+  if (MODULE_CONFIG.internalServiceKey) {
+    headers["x-admin-key"] = MODULE_CONFIG.internalServiceKey;
+  }
+
+  try {
+    var response = nk.httpRequest(
+      MODULE_CONFIG.usernameValidateUrl,
+      "post",
+      headers,
+      JSON.stringify({
+        game_id: MODULE_CONFIG.gameId,
+        username: username,
+      }),
+      MODULE_CONFIG.httpTimeoutMs,
+      false
+    );
+    if (response.code < 200 || response.code >= 300) {
+      logger.warn(
+        "username moderation endpoint rejected. code=%s user=%s",
+        response.code,
+        username
+      );
+      if (MODULE_CONFIG.usernameModerationFailOpen) {
+        return {
+          allowed: !containsBlockedUsernameToken(username),
+          source: "local_fail_open",
+        };
+      }
+      return { allowed: false, source: "platform_error" };
+    }
+    var parsed = parseHttpResponseJson(response.body);
+    return {
+      allowed: parsed.allowed === true,
+      source: "platform",
+    };
+  } catch (err) {
+    logger.warn("username moderation request failed. err=%s", err);
+    if (MODULE_CONFIG.usernameModerationFailOpen) {
+      return {
+        allowed: !containsBlockedUsernameToken(username),
+        source: "local_fail_open",
+      };
+    }
+    return { allowed: false, source: "platform_error" };
+  }
+}
+
 function containsBlockedUsernameToken(input) {
   var compact = String(input || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   if (!compact) {
     return true;
   }
-  var blocked = [
-    "admin",
-    "moderator",
-    "support",
-    "staff",
-    "owner",
-    "nigger",
-    "nigga",
-    "faggot",
-    "retard",
-    "rape",
-    "rapist",
-    "kike",
-    "chink",
-    "spic",
-    "whore",
-    "slut",
-    "cunt",
-    "fuck",
-    "shit",
-    "bitch",
-    "dick",
-    "penis",
-    "vagina",
-    "hitler",
-    "nazi",
-    "terrorist",
-  ];
+  var blocked = MODULE_CONFIG.blockedUsernameTokens || DEFAULT_BLOCKED_USERNAME_TOKENS;
   for (var i = 0; i < blocked.length; i++) {
     if (compact.indexOf(blocked[i]) >= 0) {
       return true;
     }
   }
   return false;
+}
+
+function parseBlockedUsernameTokens(rawValue, fallback) {
+  var tokens = [];
+  var raw = String(rawValue || "").trim();
+  if (!raw) {
+    return fallback.slice(0);
+  }
+  if (raw[0] === "[") {
+    try {
+      var parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (var i = 0; i < parsed.length; i++) {
+          var normalized = normalizeBlockedToken(parsed[i]);
+          if (normalized) {
+            tokens.push(normalized);
+          }
+        }
+      }
+    } catch (_err) {
+      // Fall through to CSV parse.
+    }
+  }
+  if (tokens.length === 0) {
+    var parts = raw.split(",");
+    for (var j = 0; j < parts.length; j++) {
+      var csvToken = normalizeBlockedToken(parts[j]);
+      if (csvToken) {
+        tokens.push(csvToken);
+      }
+    }
+  }
+  if (tokens.length === 0) {
+    return fallback.slice(0);
+  }
+  return dedupeStrings(tokens);
+}
+
+function normalizeBlockedToken(value) {
+  var out = String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return out;
+}
+
+function dedupeStrings(values) {
+  var out = [];
+  var seen = {};
+  for (var i = 0; i < values.length; i++) {
+    var key = String(values[i] || "");
+    if (!key || seen[key]) {
+      continue;
+    }
+    seen[key] = true;
+    out.push(key);
+  }
+  return out;
 }
 
 function hasThemeAccess(shopState, themeId) {
@@ -1463,4 +1673,21 @@ function toInt(value, fallback) {
     return fallback;
   }
   return Math.floor(parsed);
+}
+
+function toBool(value, fallback) {
+  if (value === null || value === undefined || value === "") {
+    return !!fallback;
+  }
+  var normalized = String(value).trim().toLowerCase();
+  if (!normalized) {
+    return !!fallback;
+  }
+  if (normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on") {
+    return true;
+  }
+  if (normalized === "0" || normalized === "false" || normalized === "no" || normalized === "off") {
+    return false;
+  }
+  return !!fallback;
 }

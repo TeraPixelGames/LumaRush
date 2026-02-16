@@ -149,3 +149,13 @@ Required goldens:
   - `tests/uat/TestPowerups.gd::test_depleted_button_reward_grants_that_powerup`
   - Runtime error: `Invalid call. Nonexistent function 'show_rewarded' in base 'Nil'`
   - Source: `src/ads/AdManager.gd:126` (`provider` is null in this path)
+
+---
+
+## Account + Platform Hardening (Cross-Repo)
+- [x] Centralize username moderation in `terapixel-platform` identity-gateway (single policy source).
+- [x] Wire Nakama username change RPC to identity moderation endpoint (server-to-server).
+- [x] Keep collision check in Nakama and coin charging server-side.
+- [x] Add username change audit entry shape and operational logging.
+- [x] Add rename cooldown/rate-limit safeguards.
+- [ ] Add end-to-end smoke test notes: rename -> submit score -> leaderboard name update.

@@ -38,8 +38,14 @@ Set these in `backend/nakama/local.yml` under `runtime.env`:
 - `TPX_PLATFORM_ACCOUNT_MERGE_REDEEM_URL`: `POST /v1/account/merge/redeem`
 - `TPX_PLATFORM_MAGIC_LINK_START_URL`: `POST /v1/account/magic-link/start`
 - `TPX_PLATFORM_MAGIC_LINK_COMPLETE_URL`: `POST /v1/account/magic-link/complete` (optional/manual fallback)
+- `TPX_PLATFORM_USERNAME_VALIDATE_URL`: `POST /v1/identity/internal/username/validate` (identity moderation source of truth)
+- `TPX_PLATFORM_INTERNAL_KEY`: admin key used for internal platform endpoints (maps to platform `INTERNAL_SERVICE_KEY`)
 - `TPX_MAGIC_LINK_NOTIFY_SECRET`: shared secret for platform callback RPC `tpx_account_magic_link_notify`
 - `TPX_USERNAME_CHANGE_COST_COINS`: coin price after first free username set (default `300`)
+- `TPX_USERNAME_BLOCKLIST`: optional blocked username tokens as CSV or JSON array. Example CSV: `admin,moderator,badword`; JSON: `["admin","moderator","badword"]`
+- `TPX_USERNAME_MODERATION_FAIL_OPEN`: `true|false` fallback mode when platform moderation endpoint is unavailable (default `false`).
+- `TPX_USERNAME_CHANGE_COOLDOWN_SECONDS`: cooldown between username changes (default `300`).
+- `TPX_USERNAME_CHANGE_MAX_PER_DAY`: max successful username changes per rolling day window (default `3`).
 - `TPX_GAME_ID`: game id sent to identity exchange (`lumarush` default)
 - `TPX_EXPORT_TARGET`: `ios`|`android`|`poki`|`crazygames`|`web` (used for provider selection; default `web`)
 - `TPX_HTTP_TIMEOUT_MS`: HTTP timeout for Terapixel calls (default `5000`).

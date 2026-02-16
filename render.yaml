@@ -59,6 +59,10 @@ services:
         sync: false
       - key: TPX_PLATFORM_MAGIC_LINK_COMPLETE_URL
         sync: false
+      - key: TPX_PLATFORM_USERNAME_VALIDATE_URL
+        sync: false
+      - key: TPX_PLATFORM_INTERNAL_KEY
+        sync: false
       - key: TPX_MAGIC_LINK_NOTIFY_SECRET
         sync: false
       - key: TPX_PLATFORM_IAP_ADMIN_KEY
@@ -69,6 +73,14 @@ services:
         value: "5000"
       - key: TPX_USERNAME_CHANGE_COST_COINS
         value: "300"
+      - key: TPX_USERNAME_BLOCKLIST
+        sync: false
+      - key: TPX_USERNAME_MODERATION_FAIL_OPEN
+        value: "false"
+      - key: TPX_USERNAME_CHANGE_COOLDOWN_SECONDS
+        value: "300"
+      - key: TPX_USERNAME_CHANGE_MAX_PER_DAY
+        value: "3"
       - key: LUMARUSH_LEADERBOARD_ID
         value: "lumarush_high_scores"
       - key: NAKAMA_SERVER_KEY
