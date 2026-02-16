@@ -244,10 +244,12 @@ func _authenticate_device() -> Dictionary:
 func _rpc_call(rpc_id: String, payload: Dictionary, requires_auth: bool, retry_on_unauthorized: bool) -> Dictionary:
 	var path := "/v2/rpc/%s" % rpc_id
 	var headers := _bearer_auth_headers() if requires_auth else _basic_auth_headers()
+	var rpc_payload_json: String = JSON.stringify(payload)
+	var request_body: String = JSON.stringify(rpc_payload_json)
 	var response: Dictionary = await _request_json(
 		HTTPClient.METHOD_POST,
 		path,
-		JSON.stringify(payload),
+		request_body,
 		headers
 	)
 
@@ -258,7 +260,7 @@ func _rpc_call(rpc_id: String, payload: Dictionary, requires_auth: bool, retry_o
 			response = await _request_json(
 				HTTPClient.METHOD_POST,
 				path,
-				JSON.stringify(payload),
+				request_body,
 				headers
 			)
 
