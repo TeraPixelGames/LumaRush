@@ -79,10 +79,10 @@ func style_game(scene: Control) -> void:
 	style_button(scene.get_node_or_null("UI/TopBar/Pause"), 24.0, WEIGHT_BOLD)
 	style_button(scene.get_node_or_null("UI/Powerups/Undo"), 56.0, WEIGHT_SEMIBOLD)
 	style_button(scene.get_node_or_null("UI/Powerups/RemoveColor"), 56.0, WEIGHT_SEMIBOLD)
-	style_button(scene.get_node_or_null("UI/Powerups/Shuffle"), 56.0, WEIGHT_SEMIBOLD)
+	style_button(scene.get_node_or_null("UI/Powerups/Hint"), 56.0, WEIGHT_SEMIBOLD)
 	style_label(scene.get_node_or_null("UI/Powerups/Undo/Badge"), 28.0, WEIGHT_SEMIBOLD)
 	style_label(scene.get_node_or_null("UI/Powerups/RemoveColor/Badge"), 28.0, WEIGHT_SEMIBOLD)
-	style_label(scene.get_node_or_null("UI/Powerups/Shuffle/Badge"), 28.0, WEIGHT_SEMIBOLD)
+	style_label(scene.get_node_or_null("UI/Powerups/Hint/Badge"), 28.0, WEIGHT_SEMIBOLD)
 
 func style_results(scene: Control) -> void:
 	style_label(scene.get_node_or_null("UI/VBox/Title"), 62.0, WEIGHT_BOLD)

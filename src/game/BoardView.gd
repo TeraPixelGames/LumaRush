@@ -34,7 +34,6 @@ var tiles: Array = []
 var _animating: bool = false
 var _min_match_size: int = 2
 var _game_over_emitted: bool = false
-var _hint_timer: Timer
 var _hint_tween: Tween
 var _hint_group: Array = []
 var _tile_gap_px: float = 8.0
@@ -52,7 +51,6 @@ func _ready() -> void:
 	_create_tiles()
 	_refresh_tiles()
 	queue_redraw()
-	_setup_hint_timer()
 	_check_no_moves_and_emit()
 
 func set_tile_size(new_size: float) -> void:
@@ -71,10 +69,8 @@ func set_prism_pick_mode(enabled: bool) -> void:
 		return
 	if _prism_pick_mode:
 		_clear_hint()
-		if _hint_timer:
-			_hint_timer.stop()
-	elif _check_no_moves_and_emit():
-		_restart_hint_timer()
+	else:
+		_check_no_moves_and_emit()
 
 func is_prism_pick_mode() -> bool:
 	return _prism_pick_mode
@@ -129,8 +125,7 @@ func _handle_click(pos: Vector2) -> void:
 		_trigger_match_haptic()
 		emit_signal("move_committed", group, snapshot)
 		emit_signal("match_made", group)
-		if _check_no_moves_and_emit():
-			_restart_hint_timer()
+		_check_no_moves_and_emit()
 	_animating = false
 
 func _cell_from_screen_pos(screen_pos: Vector2) -> Vector2i:
@@ -150,21 +145,19 @@ func restore_snapshot(snapshot_grid: Array) -> void:
 	_normalize_board_color_ids()
 	_game_over_emitted = false
 	_refresh_tiles()
-	if _check_no_moves_and_emit():
-		_restart_hint_timer()
+	_check_no_moves_and_emit()
 
-func apply_shuffle_powerup() -> bool:
+func apply_hint_powerup() -> bool:
 	if _animating:
 		return false
-	_animating = true
-	_clear_hint()
+	if _prism_pick_mode:
+		return false
+	var hint: Array = _find_hint_group()
+	if hint.is_empty():
+		return false
 	await _animate_powerup_charge(Color(0.7, 0.95, 1.0, 1.0))
-	board.shuffle_tiles()
-	_refresh_tiles()
+	_apply_hint(hint)
 	await _animate_powerup_release()
-	if _check_no_moves_and_emit():
-		_restart_hint_timer()
-	_animating = false
 	return true
 
 func apply_remove_color_powerup(color_idx: int = -1) -> Dictionary:
@@ -190,8 +183,7 @@ func apply_remove_color_powerup(color_idx: int = -1) -> Dictionary:
 	_normalize_board_color_ids()
 	_rebuild_tiles_from_grid()
 	await _animate_powerup_release()
-	if _check_no_moves_and_emit():
-		_restart_hint_timer()
+	_check_no_moves_and_emit()
 	_animating = false
 	return {"removed": removed, "color_idx": target_color}
 
@@ -310,44 +302,10 @@ func _check_no_moves_and_emit() -> bool:
 	if board.has_move():
 		return true
 	_clear_hint()
-	if _hint_timer:
-		_hint_timer.stop()
 	if not _game_over_emitted:
 		_game_over_emitted = true
 		emit_signal("no_moves")
 	return false
-
-func _setup_hint_timer() -> void:
-	_hint_timer = Timer.new()
-	_hint_timer.one_shot = true
-	_hint_timer.wait_time = max(0.1, FeatureFlags.match_hint_delay_seconds())
-	add_child(_hint_timer)
-	_hint_timer.timeout.connect(_on_hint_timeout)
-	_restart_hint_timer()
-
-func _restart_hint_timer() -> void:
-	if _hint_timer == null:
-		return
-	_hint_timer.stop()
-	_hint_timer.wait_time = max(0.1, FeatureFlags.match_hint_delay_seconds())
-	_hint_timer.start()
-
-func _on_hint_timeout() -> void:
-	if _prism_pick_mode:
-		return
-	if _animating or _game_over_emitted:
-		if _animating:
-			_restart_hint_timer()
-		return
-	if not board.has_move():
-		_check_no_moves_and_emit()
-		return
-	var hint := _find_hint_group()
-	if hint.is_empty():
-		_restart_hint_timer()
-		return
-	_apply_hint(hint)
-	_restart_hint_timer()
 
 func _find_hint_group() -> Array:
 	for y in range(height):
@@ -514,3 +472,5 @@ func _trigger_match_click_haptic() -> bool:
 	Input.vibrate_handheld(duration_ms, amplitude)
 	emit_signal("match_click_haptic_triggered", duration_ms, amplitude)
 	return true
+
+

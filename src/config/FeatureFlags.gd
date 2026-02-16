@@ -63,7 +63,7 @@ const MATCH_HAPTIC_DURATION_MS := 26
 const MATCH_HAPTIC_AMPLITUDE := 0.5
 const POWERUP_UNDO_CHARGES := 2
 const POWERUP_REMOVE_COLOR_CHARGES := 1
-const POWERUP_SHUFFLE_CHARGES := 1
+const POWERUP_HINT_CHARGES := 1
 const POWERUP_FLASH_ALPHA := 0.22
 const POWERUP_FLASH_SECONDS := 0.24
 
@@ -311,10 +311,13 @@ static func powerup_remove_color_charges() -> int:
 		return max(0, int(ProjectSettings.get_setting("lumarush/powerup_remove_color_charges")))
 	return POWERUP_REMOVE_COLOR_CHARGES
 
-static func powerup_shuffle_charges() -> int:
+static func powerup_hint_charges() -> int:
+	if ProjectSettings.has_setting("lumarush/powerup_hint_charges"):
+		return max(0, int(ProjectSettings.get_setting("lumarush/powerup_hint_charges")))
+	# Backward compatible with older setting key.
 	if ProjectSettings.has_setting("lumarush/powerup_shuffle_charges"):
 		return max(0, int(ProjectSettings.get_setting("lumarush/powerup_shuffle_charges")))
-	return POWERUP_SHUFFLE_CHARGES
+	return POWERUP_HINT_CHARGES
 
 static func powerup_flash_alpha() -> float:
 	if ProjectSettings.has_setting("lumarush/powerup_flash_alpha"):

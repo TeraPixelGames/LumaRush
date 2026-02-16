@@ -6,10 +6,10 @@ extends Control
 @onready var score_value_label: Label = $UI/TopBar/ScoreBox/ScoreValue
 @onready var undo_button: Button = $UI/Powerups/Undo
 @onready var remove_color_button: Button = $UI/Powerups/RemoveColor
-@onready var shuffle_button: Button = $UI/Powerups/Shuffle
+@onready var hint_button: Button = $UI/Powerups/Hint
 @onready var undo_badge: Label = $UI/Powerups/Undo/Badge
 @onready var prism_badge: Label = $UI/Powerups/RemoveColor/Badge
-@onready var shuffle_badge: Label = $UI/Powerups/Shuffle/Badge
+@onready var hint_badge: Label = $UI/Powerups/Hint/Badge
 @onready var board_frame: ColorRect = $UI/BoardFrame
 @onready var board_glow: ColorRect = $UI/BoardGlow
 @onready var powerup_flash: ColorRect = $UI/PowerupFlash
@@ -21,16 +21,16 @@ var _run_finished: bool = false
 var _ending_transition_started: bool = false
 var _undo_charges: int = 0
 var _remove_color_charges: int = 0
-var _shuffle_charges: int = 0
+var _hint_charges: int = 0
 var _undo_stack: Array[Dictionary] = []
 var _pending_powerup_refill_type: String = ""
 var _prism_selecting: bool = false
 
-const ICON_UNDO := "\u21BA"
-const ICON_PRISM := "\u25C6"
-const ICON_SHUFFLE := "\u21C4"
-const ICON_CANCEL := "\u2715"
-const ICON_LOADING := "..."
+const ICON_UNDO: Texture2D = preload("res://assets/ui/icons/atlas/powerup_undo.tres")
+const ICON_PRISM: Texture2D = preload("res://assets/ui/icons/atlas/powerup_prism.tres")
+const ICON_HINT: Texture2D = preload("res://assets/ui/icons/atlas/powerup_hint.tres")
+const ICON_CANCEL: Texture2D = preload("res://assets/ui/icons/atlas/powerup_cancel.tres")
+const ICON_LOADING: Texture2D = preload("res://assets/ui/icons/atlas/powerup_loading.tres")
 
 func _ready() -> void:
 	var stale_overlay: Node = get_node_or_null("RunEndOverlay")
@@ -59,18 +59,21 @@ func _ready() -> void:
 		AdManager.connect("rewarded_closed", Callable(self, "_on_powerup_rewarded_closed"))
 	_undo_charges = FeatureFlags.powerup_undo_charges()
 	_remove_color_charges = FeatureFlags.powerup_remove_color_charges()
-	_shuffle_charges = FeatureFlags.powerup_shuffle_charges()
+	_hint_charges = FeatureFlags.powerup_hint_charges()
 	if board_frame:
 		board_frame.visible = false
 	if board_glow:
 		board_glow.visible = false
-	for badge in [undo_badge, prism_badge, shuffle_badge]:
+	for badge in [undo_badge, prism_badge, hint_badge]:
 		badge.add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1.0))
 		badge.add_theme_color_override("font_outline_color", Color(0.1, 0.18, 0.36, 0.95))
 		badge.add_theme_constant_override("outline_size", 3)
 	undo_button.tooltip_text = "Undo"
 	remove_color_button.tooltip_text = "Prism"
-	shuffle_button.tooltip_text = "Shuffle"
+	hint_button.tooltip_text = "Hint"
+	for button in [undo_button, remove_color_button, hint_button]:
+		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button.expand_icon = true
 	powerup_flash.visible = false
 	_update_score()
 	_update_powerup_buttons()
@@ -175,26 +178,18 @@ func _on_prism_color_selected(color_idx: int) -> void:
 	MusicManager.on_match_made()
 	_play_powerup_juice(Color(1.0, 0.92, 0.7, FeatureFlags.powerup_flash_alpha()))
 
-func _on_shuffle_pressed() -> void:
+func _on_hint_pressed() -> void:
 	if _prism_selecting:
 		return
-	if _shuffle_charges <= 0:
-		_request_powerup_refill("shuffle")
+	if _hint_charges <= 0:
+		_request_powerup_refill("hint")
 		return
 	if _ending_transition_started:
 		return
-	var snapshot: Array = board.capture_snapshot()
-	var score_before: int = score
-	var combo_before: int = combo
-	var changed: bool = await board.apply_shuffle_powerup()
+	var changed: bool = await board.apply_hint_powerup()
 	if not changed:
 		return
-	_push_undo(snapshot, score_before, combo_before)
-	_shuffle_charges -= 1
-	score += 80
-	combo = max(0, combo - 1)
-	_update_score()
-	_update_gameplay_mood_from_matches(0.3)
+	_hint_charges -= 1
 	_update_powerup_buttons()
 	_play_powerup_juice(Color(0.8, 0.86, 1.0, FeatureFlags.powerup_flash_alpha()))
 
@@ -208,17 +203,17 @@ func _update_gameplay_mood_from_matches(fade_seconds: float = -1.0) -> void:
 	BackgroundMood.set_mood_mix(calm_weight, fade)
 
 func _update_powerup_buttons() -> void:
-	undo_button.text = _powerup_button_icon(ICON_UNDO, "undo")
-	remove_color_button.text = _powerup_button_icon(ICON_PRISM, "prism")
-	shuffle_button.text = _powerup_button_icon(ICON_SHUFFLE, "shuffle")
+	undo_button.icon = _powerup_button_icon(ICON_UNDO, "undo")
+	remove_color_button.icon = _powerup_button_icon(ICON_PRISM, "prism")
+	hint_button.icon = _powerup_button_icon(ICON_HINT, "hint")
 	remove_color_button.tooltip_text = "Tap a tile color to clear it" if _prism_selecting else "Prism"
 	_update_badge(undo_badge, _undo_charges, _pending_powerup_refill_type == "undo")
 	var prism_hint: String = "Tap Color" if _prism_selecting else ""
 	_update_badge(prism_badge, _remove_color_charges, _pending_powerup_refill_type == "prism", prism_hint)
-	_update_badge(shuffle_badge, _shuffle_charges, _pending_powerup_refill_type == "shuffle")
+	_update_badge(hint_badge, _hint_charges, _pending_powerup_refill_type == "hint")
 	undo_button.disabled = (_undo_charges > 0 and _undo_stack.is_empty()) or _is_other_refill_pending("undo") or _prism_selecting
 	remove_color_button.disabled = _is_other_refill_pending("prism")
-	shuffle_button.disabled = _is_other_refill_pending("shuffle") or _prism_selecting
+	hint_button.disabled = _is_other_refill_pending("hint") or _prism_selecting
 
 func _push_undo(snapshot: Array, score_snapshot: int, combo_snapshot: int) -> void:
 	_undo_stack.append({
@@ -261,8 +256,8 @@ func _grant_bonus_powerup(powerup_type: String) -> void:
 			_undo_charges += 1
 		"prism":
 			_remove_color_charges += 1
-		"shuffle":
-			_shuffle_charges += 1
+		"hint":
+			_hint_charges += 1
 	_update_powerup_buttons()
 	_play_powerup_juice(Color(1.0, 0.94, 0.58, 0.28))
 	Input.vibrate_handheld(38, 0.65)
@@ -291,7 +286,7 @@ func _request_powerup_refill(powerup_type: String) -> void:
 		_pending_powerup_refill_type = ""
 		_update_powerup_buttons()
 
-func _powerup_button_icon(base_icon: String, powerup_type: String) -> String:
+func _powerup_button_icon(base_icon: Texture2D, powerup_type: String) -> Texture2D:
 	if _prism_selecting and powerup_type == "prism":
 		return ICON_CANCEL
 	if _pending_powerup_refill_type == powerup_type:
