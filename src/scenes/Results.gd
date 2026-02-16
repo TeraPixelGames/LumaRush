@@ -14,11 +14,7 @@ func _ready() -> void:
 	Typography.style_results(self)
 	_update_labels()
 	_bind_online_signals()
-	NakamaService.submit_score_background(RunManager.last_score, {
-		"source": "results_ready",
-	})
-	NakamaService.refresh_my_high_score()
-	NakamaService.refresh_leaderboard(5)
+	_sync_online_results()
 	_play_intro()
 	if StreakManager.is_streak_at_risk():
 		var modal := preload("res://src/scenes/SaveStreakModal.tscn").instantiate()
@@ -83,6 +79,13 @@ func _on_high_score_updated(_record: Dictionary) -> void:
 
 func _on_leaderboard_updated(records: Array) -> void:
 	leaderboard_label.text = _format_leaderboard(records)
+
+func _sync_online_results() -> void:
+	await NakamaService.submit_score(RunManager.last_score, {
+		"source": "results_ready",
+	})
+	await NakamaService.refresh_my_high_score()
+	await NakamaService.refresh_leaderboard(5)
 
 func _format_leaderboard(records: Array) -> String:
 	if records.is_empty():

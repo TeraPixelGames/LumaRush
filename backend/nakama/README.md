@@ -125,4 +125,9 @@ This repo now includes a Render Blueprint at `render.yaml` for a managed Postgre
    - `NAKAMA_CONSOLE_PASSWORD` (recommended)
 4. Deploy.
 
-The Render startup script (`backend/nakama/render/start.sh`) runs migrations then starts Nakama.
+The Render startup script (`backend/nakama/render/start.sh`) runs migrations, starts Nakama on internal ports, and fronts it with nginx on Render's public `PORT`.
+
+On Render:
+
+- API/Client endpoints: `https://<your-service>.onrender.com/`
+- Console: `https://<your-service>.onrender.com/console/`

@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+GameSiteSDK="*res://src/platform/GameSiteSDK.gd"
 SaveStore="*res://src/data/SaveStore.gd"
 StreakManager="*res://src/data/StreakManager.gd"
 AdManager="*res://src/ads/AdManager.gd"
@@ -48,17 +49,17 @@ window/handheld/orientation=1
 
 enabled=PackedStringArray("res://addons/AdmobPlugin/plugin.cfg", "res://addons/gdUnit4/plugin.cfg")
 
-[rendering]
-
-renderer/rendering_method="mobile"
-textures/vram_compression/import_etc2_astc=true
-
 [lumarush]
 
 nakama_enable_client=true
 nakama_base_url="https://lumarush-nakama.onrender.com"
-nakama_server_key="CHANGE_ME_RENDER_SERVER_KEY"
+nakama_server_key="RF0fcDiNclh0ZdjfBgXgFPj/9+UcSWigdtfkw/aUb5I="
 nakama_leaderboard_limit=10
 platform="terapixel"
 terapixel_user_id=""
 terapixel_display_name=""
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

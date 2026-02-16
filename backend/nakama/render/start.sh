@@ -36,6 +36,8 @@ RUNTIME_ENV_TPX_EVENT="${TPX_PLATFORM_EVENT_URL:-}"
 RUNTIME_ENV_TPX_API_KEY="${TPX_PLATFORM_API_KEY:-}"
 RUNTIME_ENV_TPX_TIMEOUT="${TPX_HTTP_TIMEOUT_MS:-5000}"
 RUNTIME_ENV_LEADERBOARD_ID="${LUMARUSH_LEADERBOARD_ID:-lumarush_high_scores}"
+NAKAMA_SOCKET_PORT="${NAKAMA_SOCKET_PORT:-7354}"
+NAKAMA_CONSOLE_PORT="${NAKAMA_CONSOLE_PORT:-7355}"
 
 cat > /tmp/render-local.yml <<EOF
 name: "lumarush-nakama"
@@ -48,8 +50,9 @@ session:
   refresh_token_expiry_sec: 604800
 socket:
   server_key: "${NAKAMA_SERVER_KEY}"
+  port: ${NAKAMA_SOCKET_PORT}
 console:
-  port: 7351
+  port: ${NAKAMA_CONSOLE_PORT}
   username: "${NAKAMA_CONSOLE_USERNAME:-admin}"
   password: "${NAKAMA_CONSOLE_PASSWORD:-adminpassword}"
 runtime:
@@ -67,8 +70,19 @@ EOF
 echo "Running Nakama migrations..."
 /nakama/nakama migrate up --database.address "${DB_ADDRESS}"
 
-echo "Starting Nakama on port ${PORT}..."
-exec /nakama/nakama \
+echo "Starting Nakama on internal ports (socket=${NAKAMA_SOCKET_PORT}, console=${NAKAMA_CONSOLE_PORT})..."
+/nakama/nakama \
   --config /tmp/render-local.yml \
   --database.address "${DB_ADDRESS}" \
-  --socket.port "${PORT}"
+  --socket.port "${NAKAMA_SOCKET_PORT}" \
+  --console.port "${NAKAMA_CONSOLE_PORT}" &
+
+echo "Rendering nginx config for public port ${PORT}..."
+export PORT
+export NAKAMA_SOCKET_PORT
+export NAKAMA_CONSOLE_PORT
+envsubst '${PORT} ${NAKAMA_SOCKET_PORT} ${NAKAMA_CONSOLE_PORT}' \
+  < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+
+echo "Starting nginx reverse proxy..."
+exec nginx -g "daemon off;"
