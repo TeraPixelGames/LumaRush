@@ -85,14 +85,17 @@ func style_game(scene: Control) -> void:
 	style_label(scene.get_node_or_null("UI/Powerups/Shuffle/Badge"), 28.0, WEIGHT_SEMIBOLD)
 
 func style_results(scene: Control) -> void:
-	style_label(scene.get_node_or_null("UI/VBox/Title"), 54.0, WEIGHT_BOLD)
-	style_label(scene.get_node_or_null("UI/VBox/Score"), 84.0, WEIGHT_BOLD)
-	style_label(scene.get_node_or_null("UI/VBox/Best"), 32.0, WEIGHT_MEDIUM, true)
-	style_label(scene.get_node_or_null("UI/VBox/Streak"), 32.0, WEIGHT_MEDIUM, true)
-	style_label(scene.get_node_or_null("UI/VBox/OnlineStatus"), 24.0, WEIGHT_MEDIUM, true)
-	style_label(scene.get_node_or_null("UI/VBox/Leaderboard"), 22.0, WEIGHT_REGULAR, true)
-	style_button(scene.get_node_or_null("UI/VBox/PlayAgain"), 34.0, WEIGHT_BOLD)
-	style_button(scene.get_node_or_null("UI/VBox/Menu"), 30.0, WEIGHT_SEMIBOLD)
+	style_label(scene.get_node_or_null("UI/VBox/Title"), 62.0, WEIGHT_BOLD)
+	style_label(scene.get_node_or_null("UI/VBox/Score"), 64.0, WEIGHT_BOLD)
+	style_label(scene.get_node_or_null("UI/VBox/Best"), 34.0, WEIGHT_BOLD, false)
+	style_label(scene.get_node_or_null("UI/VBox/Streak"), 34.0, WEIGHT_BOLD, false)
+	style_label(scene.get_node_or_null("UI/VBox/OnlineStatus"), 30.0, WEIGHT_BOLD, false)
+	var leaderboard := scene.get_node_or_null("UI/VBox/Leaderboard")
+	style_label(leaderboard, 28.0, WEIGHT_SEMIBOLD, false)
+	if leaderboard != null:
+		leaderboard.add_theme_constant_override("line_spacing", max(2, int(round(6.0 * scale_factor()))))
+	style_button(scene.get_node_or_null("UI/VBox/PlayAgain"), 36.0, WEIGHT_BOLD)
+	style_button(scene.get_node_or_null("UI/VBox/Menu"), 36.0, WEIGHT_BOLD)
 
 func style_pause_overlay(scene: Control) -> void:
 	style_label(scene.get_node_or_null("VBox/Title"), SIZE_MODAL_TITLE, WEIGHT_BOLD)

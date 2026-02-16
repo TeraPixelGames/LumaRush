@@ -44,20 +44,17 @@ func _on_menu_pressed() -> void:
 
 func _play_intro() -> void:
 	var ui: CanvasItem = $UI
-	var bloom: CanvasItem = $UI/PanelBloom
 	var panel: CanvasItem = $UI/Panel
 	var box: CanvasItem = $UI/VBox
 	var play_again: CanvasItem = $UI/VBox/PlayAgain
 	var menu: CanvasItem = $UI/VBox/Menu
 	ui.modulate.a = 0.0
-	bloom.modulate.a = 0.0
 	panel.scale = Vector2(0.9, 0.9)
 	box.scale = Vector2(0.95, 0.95)
 	play_again.modulate.a = 0.0
 	menu.modulate.a = 0.0
 	var t := create_tween()
 	t.tween_property(ui, "modulate:a", 1.0, 0.28)
-	t.parallel().tween_property(bloom, "modulate:a", 1.0, 0.46)
 	t.parallel().tween_property(panel, "scale", Vector2.ONE, 0.38).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.parallel().tween_property(box, "scale", Vector2.ONE, 0.34).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_property(play_again, "modulate:a", 1.0, 0.16)
@@ -91,7 +88,7 @@ func _format_leaderboard(records: Array) -> String:
 	if records.is_empty():
 		return "Leaderboard: no online records yet"
 	var lines: Array[String] = []
-	var count: int = min(records.size(), 5)
+	var count: int = min(records.size(), 3)
 	for i in range(count):
 		var item: Variant = records[i]
 		if typeof(item) != TYPE_DICTIONARY:

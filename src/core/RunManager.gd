@@ -16,11 +16,6 @@ func start_game() -> void:
 func end_game(score: int) -> void:
 	last_score = score
 	SaveStore.set_high_score(score)
-	NakamaService.submit_score_background(score, {
-		"mode": "classic",
-		"streak_days": StreakManager.get_streak_days(),
-		"games_played": int(SaveStore.data.get("games_played", 0)),
-	})
 	StreakManager.record_game_play()
 	AdManager.on_game_finished()
 	get_tree().change_scene_to_file(RESULTS_SCENE)
