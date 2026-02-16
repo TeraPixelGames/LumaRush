@@ -25,6 +25,7 @@ var _hint_charges: int = 0
 var _undo_stack: Array[Dictionary] = []
 var _pending_powerup_refill_type: String = ""
 var _prism_selecting: bool = false
+var _powerup_coin_costs := {"undo": 120, "prism": 180, "hint": 140}
 
 const ICON_UNDO: Texture2D = preload("res://assets/ui/icons/atlas/powerup_undo.tres")
 const ICON_PRISM: Texture2D = preload("res://assets/ui/icons/atlas/powerup_prism.tres")
@@ -43,6 +44,7 @@ func _ready() -> void:
 	$BoardView.modulate = Color(1, 1, 1, 1)
 	$UI.modulate = Color(1, 1, 1, 1)
 	Typography.style_game(self)
+	ThemeManager.apply_to_scene(self)
 	BackgroundMood.register_controller($BackgroundController)
 	_update_gameplay_mood_from_matches(0.0)
 	BackgroundMood.reset_starfield_emission_taper()
@@ -60,6 +62,11 @@ func _ready() -> void:
 	_undo_charges = FeatureFlags.powerup_undo_charges()
 	_remove_color_charges = FeatureFlags.powerup_remove_color_charges()
 	_hint_charges = FeatureFlags.powerup_hint_charges()
+	var wallet_shop: Dictionary = NakamaService.get_shop_state()
+	var stored_powerups: Dictionary = wallet_shop.get("powerups", {})
+	_undo_charges += int(stored_powerups.get("undo", 0))
+	_remove_color_charges += int(stored_powerups.get("prism", 0))
+	_hint_charges += int(stored_powerups.get("hint", 0))
 	if board_frame:
 		board_frame.visible = false
 	if board_glow:
@@ -118,14 +125,16 @@ func _on_resume() -> void:
 
 func _on_quit() -> void:
 	get_tree().paused = false
-	_finish_run()
+	_finish_run(false)
 
 func _on_undo_pressed() -> void:
 	if _prism_selecting:
 		return
 	if _undo_charges <= 0:
-		_request_powerup_refill("undo")
-		return
+		var purchased := await _try_purchase_powerup_with_coins("undo")
+		if not purchased:
+			_request_powerup_refill("undo")
+			return
 	if _undo_stack.is_empty():
 		return
 	if _ending_transition_started:
@@ -135,6 +144,7 @@ func _on_undo_pressed() -> void:
 	score = int(state["score"])
 	combo = int(state["combo"])
 	_undo_charges -= 1
+	call_deferred("_consume_powerup_server", "undo")
 	_update_score()
 	_update_gameplay_mood_from_matches(0.3)
 	_update_powerup_buttons()
@@ -146,8 +156,10 @@ func _on_remove_color_pressed() -> void:
 		_update_powerup_buttons()
 		return
 	if _remove_color_charges <= 0:
-		_request_powerup_refill("prism")
-		return
+		var purchased := await _try_purchase_powerup_with_coins("prism")
+		if not purchased:
+			_request_powerup_refill("prism")
+			return
 	if _ending_transition_started:
 		return
 	_set_prism_selection(true)
@@ -170,6 +182,7 @@ func _on_prism_color_selected(color_idx: int) -> void:
 		return
 	_push_undo(snapshot, score_before, combo_before)
 	_remove_color_charges -= 1
+	call_deferred("_consume_powerup_server", "prism")
 	combo += 1
 	score += removed * 12
 	_update_score()
@@ -182,14 +195,17 @@ func _on_hint_pressed() -> void:
 	if _prism_selecting:
 		return
 	if _hint_charges <= 0:
-		_request_powerup_refill("hint")
-		return
+		var purchased := await _try_purchase_powerup_with_coins("hint")
+		if not purchased:
+			_request_powerup_refill("hint")
+			return
 	if _ending_transition_started:
 		return
 	var changed: bool = await board.apply_hint_powerup()
 	if not changed:
 		return
 	_hint_charges -= 1
+	call_deferred("_consume_powerup_server", "hint")
 	_update_powerup_buttons()
 	_play_powerup_juice(Color(0.8, 0.86, 1.0, FeatureFlags.powerup_flash_alpha()))
 
@@ -286,6 +302,27 @@ func _request_powerup_refill(powerup_type: String) -> void:
 		_pending_powerup_refill_type = ""
 		_update_powerup_buttons()
 
+func _try_purchase_powerup_with_coins(powerup_type: String) -> bool:
+	var cost: int = int(_powerup_coin_costs.get(powerup_type, 0))
+	if cost <= 0:
+		return false
+	var purchase_id := "%s_%d" % [powerup_type, Time.get_unix_time_from_system()]
+	var result: Dictionary = await NakamaService.purchase_powerup(powerup_type, 1, cost, purchase_id)
+	if not result.get("ok", false):
+		return false
+	match powerup_type:
+		"undo":
+			_undo_charges += 1
+		"prism":
+			_remove_color_charges += 1
+		"hint":
+			_hint_charges += 1
+	_update_powerup_buttons()
+	return true
+
+func _consume_powerup_server(powerup_type: String) -> void:
+	await NakamaService.consume_powerup(powerup_type, 1)
+
 func _powerup_button_icon(base_icon: Texture2D, powerup_type: String) -> Texture2D:
 	if _prism_selecting and powerup_type == "prism":
 		return ICON_CANCEL
@@ -343,9 +380,9 @@ func _set_prism_selection(enabled: bool) -> void:
 		board.set_prism_pick_mode(_prism_selecting)
 
 func _on_no_moves() -> void:
-	_finish_run()
+	_finish_run(true)
 
-func _finish_run() -> void:
+func _finish_run(completed_by_gameplay: bool) -> void:
 	if _run_finished:
 		return
 	if _ending_transition_started:
@@ -355,7 +392,7 @@ func _finish_run() -> void:
 	_set_prism_selection(false)
 	await _play_end_transition()
 	_run_finished = true
-	RunManager.end_game(score)
+	RunManager.end_game(score, completed_by_gameplay)
 
 func _play_end_transition() -> void:
 	set_process_input(false)

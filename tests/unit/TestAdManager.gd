@@ -84,18 +84,18 @@ func test_rewarded_powerup_emits_powerup_signal() -> void:
 	get_tree().root.add_child(manager)
 	manager.provider = provider
 	get_tree().root.add_child(provider)
-	var powerup_earned: bool = false
-	var save_earned: bool = false
+	var powerup_earned: Array[bool] = [false]
+	var save_earned: Array[bool] = [false]
 	manager.connect("rewarded_powerup_earned", func() -> void:
-		powerup_earned = true
+		powerup_earned[0] = true
 	)
 	manager.connect("rewarded_earned", func() -> void:
-		save_earned = true
+		save_earned[0] = true
 	)
 	assert_that(manager.show_rewarded_for_powerup()).is_true()
 	manager._on_rewarded_earned()
-	assert_that(powerup_earned).is_true()
-	assert_that(save_earned).is_false()
+	assert_that(powerup_earned[0]).is_true()
+	assert_that(save_earned[0]).is_false()
 	manager.queue_free()
 	provider.queue_free()
 
@@ -106,12 +106,12 @@ func test_rewarded_retry_exhausted_emits_closed() -> void:
 	get_tree().root.add_child(manager)
 	manager.provider = provider
 	get_tree().root.add_child(provider)
-	var closed_count: int = 0
+	var closed_count: Array[int] = [0]
 	manager.connect("rewarded_closed", func() -> void:
-		closed_count += 1
+		closed_count[0] += 1
 	)
 	assert_that(manager.show_rewarded_for_powerup()).is_true()
 	await get_tree().create_timer(0.18).timeout
-	assert_that(closed_count).is_equal(1)
+	assert_that(closed_count[0]).is_equal(1)
 	manager.queue_free()
 	provider.queue_free()

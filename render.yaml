@@ -41,8 +41,34 @@ services:
         sync: false
       - key: TPX_PLATFORM_API_KEY
         sync: false
+      - key: TPX_PLATFORM_IAP_START_URL
+        sync: false
+      - key: TPX_PLATFORM_IAP_ENTITLEMENTS_URL
+        sync: false
+      - key: TPX_PLATFORM_IAP_VERIFY_URL
+        sync: false
+      - key: TPX_PLATFORM_IAP_COINS_ADJUST_URL
+        sync: false
+      - key: TPX_PLATFORM_IDENTITY_NAKAMA_AUTH_URL
+        sync: false
+      - key: TPX_PLATFORM_ACCOUNT_MERGE_CODE_URL
+        sync: false
+      - key: TPX_PLATFORM_ACCOUNT_MERGE_REDEEM_URL
+        sync: false
+      - key: TPX_PLATFORM_MAGIC_LINK_START_URL
+        sync: false
+      - key: TPX_PLATFORM_MAGIC_LINK_COMPLETE_URL
+        sync: false
+      - key: TPX_MAGIC_LINK_NOTIFY_SECRET
+        sync: false
+      - key: TPX_PLATFORM_IAP_ADMIN_KEY
+        sync: false
+      - key: TPX_GAME_ID
+        value: "lumarush"
       - key: TPX_HTTP_TIMEOUT_MS
         value: "5000"
+      - key: TPX_USERNAME_CHANGE_COST_COINS
+        value: "300"
       - key: LUMARUSH_LEADERBOARD_ID
         value: "lumarush_high_scores"
       - key: NAKAMA_SERVER_KEY

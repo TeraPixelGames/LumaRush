@@ -19,6 +19,6 @@ func test_mobile_portrait_and_stretch_settings() -> void:
 
 func test_required_addons_exist() -> void:
 	var gdunit_path: String = ProjectSettings.globalize_path("res://addons/gdUnit4")
-	var admob_path: String = ProjectSettings.globalize_path("res://addons/godot-admob")
+	var admob_path: String = ProjectSettings.globalize_path("res://addons/AdmobPlugin")
 	assert_that(DirAccess.dir_exists_absolute(gdunit_path)).is_true()
 	assert_that(DirAccess.dir_exists_absolute(admob_path)).is_true()

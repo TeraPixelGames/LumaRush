@@ -8,15 +8,19 @@ func test_main_menu_track_selection_updates_state_and_manager() -> void:
 	await get_tree().process_frame
 
 	var tracks: Array[Dictionary] = MusicManager.get_available_tracks()
-	var target_index: int = 0
+	assert_that(tracks.size()).is_greater(0)
+	var current_id: String = MusicManager.get_current_track_id()
+	var current_index: int = 0
 	for i in range(tracks.size()):
-		if str(tracks[i].get("id", "")) == "glassgrid":
-			target_index = i
+		if str(tracks[i].get("id", "")) == current_id:
+			current_index = i
 			break
-	menu._on_track_option_item_selected(target_index)
+	var next_index: int = posmod(current_index + 1, tracks.size())
+	var expected_next_id: String = str(tracks[next_index].get("id", ""))
+	menu._on_track_next_pressed()
 
-	assert_that(str(SaveStore.data["selected_track_id"])).is_equal("glassgrid")
-	assert_that(MusicManager.get_current_track_id()).is_equal("glassgrid")
+	assert_that(str(SaveStore.data["selected_track_id"])).is_equal(expected_next_id)
+	assert_that(MusicManager.get_current_track_id()).is_equal(expected_next_id)
 
 	menu.queue_free()
 	MusicManager.set_track(original_track, false)

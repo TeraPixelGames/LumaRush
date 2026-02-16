@@ -14,6 +14,11 @@ var data := {
 	"nakama_user_id": "",
 	"terapixel_user_id": "",
 	"terapixel_display_name": "",
+	"coins": 0,
+	"owned_themes": ["default"],
+	"equipped_theme": "default",
+	"theme_rentals": {},
+	"owned_powerups": {"undo": 0, "prism": 0, "hint": 0},
 }
 
 func _ready() -> void:
@@ -136,3 +141,63 @@ func get_terapixel_user_id() -> String:
 
 func get_terapixel_display_name() -> String:
 	return str(data.get("terapixel_display_name", ""))
+
+func set_coins(value: int) -> void:
+	data["coins"] = max(0, value)
+	save()
+
+func get_coins() -> int:
+	return int(data.get("coins", 0))
+
+func get_owned_themes() -> Array:
+	var raw: Variant = data.get("owned_themes", ["default"])
+	if typeof(raw) == TYPE_ARRAY:
+		return (raw as Array).duplicate(true)
+	return ["default"]
+
+func set_owned_themes(themes: Array) -> void:
+	var out: Array = []
+	for theme_var in themes:
+		var theme_id := str(theme_var).strip_edges().to_lower()
+		if theme_id.is_empty():
+			continue
+		if out.has(theme_id):
+			continue
+		out.append(theme_id)
+	if not out.has("default"):
+		out.push_front("default")
+	data["owned_themes"] = out
+	save()
+
+func get_equipped_theme() -> String:
+	var theme_id := str(data.get("equipped_theme", "default")).strip_edges().to_lower()
+	if theme_id.is_empty():
+		return "default"
+	return theme_id
+
+func set_equipped_theme(theme_id: String) -> void:
+	var cleaned := theme_id.strip_edges().to_lower()
+	if cleaned.is_empty():
+		cleaned = "default"
+	data["equipped_theme"] = cleaned
+	save()
+
+func set_theme_rentals(rentals: Dictionary) -> void:
+	data["theme_rentals"] = rentals.duplicate(true)
+	save()
+
+func get_theme_rentals() -> Dictionary:
+	var raw: Variant = data.get("theme_rentals", {})
+	if typeof(raw) == TYPE_DICTIONARY:
+		return (raw as Dictionary).duplicate(true)
+	return {}
+
+func set_owned_powerups(powerups: Dictionary) -> void:
+	data["owned_powerups"] = powerups.duplicate(true)
+	save()
+
+func get_owned_powerups() -> Dictionary:
+	var raw: Variant = data.get("owned_powerups", {"undo": 0, "prism": 0, "hint": 0})
+	if typeof(raw) == TYPE_DICTIONARY:
+		return (raw as Dictionary).duplicate(true)
+	return {"undo": 0, "prism": 0, "hint": 0}

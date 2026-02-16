@@ -5,6 +5,13 @@ extends Control
 @onready var streak_label: Label = $UI/VBox/Streak
 @onready var online_status_label: Label = $UI/VBox/OnlineStatus
 @onready var leaderboard_label: Label = $UI/VBox/Leaderboard
+@onready var coins_earned_label: Label = $UI/VBox/CoinsEarned
+@onready var coin_balance_label: Label = $UI/VBox/CoinBalance
+@onready var double_reward_button: Button = $UI/VBox/DoubleReward
+
+var _base_reward_claimed: bool = false
+var _double_reward_pending: bool = false
+var _base_reward_amount: int = 0
 
 func _ready() -> void:
 	BackgroundMood.register_controller($BackgroundController)
@@ -12,14 +19,18 @@ func _ready() -> void:
 	MusicManager.fade_to_calm(0.6)
 	VisualTestMode.apply_if_enabled($BackgroundController, $BackgroundController)
 	Typography.style_results(self)
+	ThemeManager.apply_to_scene(self)
 	_refresh_intro_pivots()
 	_update_labels()
 	_bind_online_signals()
 	_sync_online_results()
+	_sync_wallet_rewards()
 	_play_intro()
 	if StreakManager.is_streak_at_risk():
 		var modal := preload("res://src/scenes/SaveStreakModal.tscn").instantiate()
 		add_child(modal)
+	if not AdManager.is_connected("rewarded_powerup_earned", Callable(self, "_on_double_reward_ad_earned")):
+		AdManager.connect("rewarded_powerup_earned", Callable(self, "_on_double_reward_ad_earned"))
 
 func _update_labels() -> void:
 	score_label.text = "%d" % RunManager.last_score
@@ -35,6 +46,11 @@ func _update_labels() -> void:
 	streak_label.text = "Streak: %d" % StreakManager.get_streak_days()
 	online_status_label.text = "Online: %s" % NakamaService.get_online_status()
 	leaderboard_label.text = _format_leaderboard(NakamaService.get_leaderboard_records())
+	coin_balance_label.text = "Coins balance: %d" % NakamaService.get_coin_balance()
+	if _base_reward_claimed:
+		coins_earned_label.text = "Coins earned: %d" % _base_reward_amount
+	else:
+		coins_earned_label.text = "Coins earned: pending"
 
 func _on_play_again_pressed() -> void:
 	AdManager.maybe_show_interstitial()
@@ -92,6 +108,55 @@ func _sync_online_results() -> void:
 	})
 	await NakamaService.refresh_my_high_score()
 	await NakamaService.refresh_leaderboard(5)
+
+func _sync_wallet_rewards() -> void:
+	await NakamaService.refresh_wallet(false)
+	var claim: Dictionary = await NakamaService.claim_run_reward(
+		RunManager.last_score,
+		StreakManager.get_streak_days(),
+		RunManager.last_run_completed_by_gameplay,
+		false,
+		RunManager.last_run_id
+	)
+	if claim.get("ok", false):
+		var data: Dictionary = claim.get("data", {})
+		_base_reward_claimed = bool(data.get("granted", false))
+		_base_reward_amount = int(data.get("rewardCoins", 0))
+	coin_balance_label.text = "Coins balance: %d" % NakamaService.get_coin_balance()
+	coins_earned_label.text = "Coins earned: %d" % _base_reward_amount
+	double_reward_button.disabled = not RunManager.last_run_completed_by_gameplay
+
+func _on_double_reward_pressed() -> void:
+	if not RunManager.last_run_completed_by_gameplay:
+		return
+	if _base_reward_amount <= 0:
+		return
+	_double_reward_pending = true
+	double_reward_button.disabled = true
+	double_reward_button.text = "Loading ad..."
+	if not AdManager.show_rewarded_for_powerup():
+		_double_reward_pending = false
+		double_reward_button.disabled = false
+		double_reward_button.text = "Watch Ad: Double Coins"
+
+func _on_double_reward_ad_earned() -> void:
+	if not _double_reward_pending:
+		return
+	_double_reward_pending = false
+	var claim: Dictionary = await NakamaService.claim_run_reward(
+		RunManager.last_score,
+		StreakManager.get_streak_days(),
+		RunManager.last_run_completed_by_gameplay,
+		false,
+		RunManager.last_run_id + ":double"
+	)
+	if claim.get("ok", false):
+		var data: Dictionary = claim.get("data", {})
+		var extra: int = int(data.get("rewardCoins", 0))
+		_base_reward_amount += extra
+	coins_earned_label.text = "Coins earned: %d" % _base_reward_amount
+	coin_balance_label.text = "Coins balance: %d" % NakamaService.get_coin_balance()
+	double_reward_button.text = "Coins Doubled"
 
 func _format_leaderboard(records: Array) -> String:
 	if records.is_empty():

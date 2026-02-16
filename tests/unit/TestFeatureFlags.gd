@@ -28,7 +28,7 @@ func before() -> void:
 	ProjectSettings.set_setting("lumarush/match_haptic_amplitude", FeatureFlags.MATCH_HAPTIC_AMPLITUDE)
 	ProjectSettings.set_setting("lumarush/powerup_undo_charges", FeatureFlags.POWERUP_UNDO_CHARGES)
 	ProjectSettings.set_setting("lumarush/powerup_remove_color_charges", FeatureFlags.POWERUP_REMOVE_COLOR_CHARGES)
-	ProjectSettings.set_setting("lumarush/powerup_shuffle_charges", FeatureFlags.POWERUP_SHUFFLE_CHARGES)
+	ProjectSettings.set_setting("lumarush/powerup_hint_charges", FeatureFlags.POWERUP_HINT_CHARGES)
 	ProjectSettings.set_setting("lumarush/powerup_flash_alpha", FeatureFlags.POWERUP_FLASH_ALPHA)
 	ProjectSettings.set_setting("lumarush/powerup_flash_seconds", FeatureFlags.POWERUP_FLASH_SECONDS)
 
@@ -105,13 +105,19 @@ func test_clear_high_score_flag_override() -> void:
 func test_powerup_flags_override() -> void:
 	assert_that(FeatureFlags.powerup_undo_charges()).is_equal(FeatureFlags.POWERUP_UNDO_CHARGES)
 	assert_that(FeatureFlags.powerup_remove_color_charges()).is_equal(FeatureFlags.POWERUP_REMOVE_COLOR_CHARGES)
-	assert_that(FeatureFlags.powerup_shuffle_charges()).is_equal(FeatureFlags.POWERUP_SHUFFLE_CHARGES)
+	assert_that(FeatureFlags.powerup_hint_charges()).is_equal(FeatureFlags.POWERUP_HINT_CHARGES)
 	ProjectSettings.set_setting("lumarush/powerup_undo_charges", 3)
 	ProjectSettings.set_setting("lumarush/powerup_remove_color_charges", 2)
-	ProjectSettings.set_setting("lumarush/powerup_shuffle_charges", 4)
+	ProjectSettings.set_setting("lumarush/powerup_hint_charges", 4)
 	assert_that(FeatureFlags.powerup_undo_charges()).is_equal(3)
 	assert_that(FeatureFlags.powerup_remove_color_charges()).is_equal(2)
-	assert_that(FeatureFlags.powerup_shuffle_charges()).is_equal(4)
+	assert_that(FeatureFlags.powerup_hint_charges()).is_equal(4)
+
+func test_powerup_hint_charges_legacy_key_fallback() -> void:
+	if ProjectSettings.has_setting("lumarush/powerup_hint_charges"):
+		ProjectSettings.clear("lumarush/powerup_hint_charges")
+	ProjectSettings.set_setting("lumarush/powerup_shuffle_charges", 5)
+	assert_that(FeatureFlags.powerup_hint_charges()).is_equal(5)
 
 func test_powerup_flash_flags_override() -> void:
 	assert_that(FeatureFlags.powerup_flash_alpha()).is_equal(FeatureFlags.POWERUP_FLASH_ALPHA)

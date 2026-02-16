@@ -72,6 +72,9 @@ func style_main_menu(scene: Control) -> void:
 	style_label(scene.get_node_or_null("UI/VBox/TrackCarousel/TrackNameHost/TrackName"), 24.0, WEIGHT_SEMIBOLD)
 	style_button(scene.get_node_or_null("UI/VBox/TrackCarousel/TrackNext"), 26.0, WEIGHT_BOLD)
 	style_button(scene.get_node_or_null("UI/VBox/Start"), SIZE_BUTTON, WEIGHT_SEMIBOLD)
+	style_button(scene.get_node_or_null("UI/Account"), 20.0, WEIGHT_SEMIBOLD)
+	style_button(scene.get_node_or_null("UI/Shop"), 20.0, WEIGHT_SEMIBOLD)
+	style_label(scene.get_node_or_null("UI/Shop/CoinBadge"), 16.0, WEIGHT_BOLD)
 
 func style_game(scene: Control) -> void:
 	style_label(scene.get_node_or_null("UI/TopBar/ScoreBox/ScoreCaption"), 20.0, WEIGHT_MEDIUM, true)
@@ -92,8 +95,11 @@ func style_results(scene: Control) -> void:
 	style_label(scene.get_node_or_null("UI/VBox/OnlineStatus"), 30.0, WEIGHT_BOLD, false)
 	var leaderboard := scene.get_node_or_null("UI/VBox/Leaderboard")
 	style_label(leaderboard, 28.0, WEIGHT_SEMIBOLD, false)
+	style_label(scene.get_node_or_null("UI/VBox/CoinsEarned"), 26.0, WEIGHT_BOLD, false)
+	style_label(scene.get_node_or_null("UI/VBox/CoinBalance"), 24.0, WEIGHT_SEMIBOLD, false)
 	if leaderboard != null:
 		leaderboard.add_theme_constant_override("line_spacing", max(2, int(round(6.0 * scale_factor()))))
+	style_button(scene.get_node_or_null("UI/VBox/DoubleReward"), 24.0, WEIGHT_SEMIBOLD)
 	style_button(scene.get_node_or_null("UI/VBox/PlayAgain"), 36.0, WEIGHT_BOLD)
 	style_button(scene.get_node_or_null("UI/VBox/Menu"), 36.0, WEIGHT_BOLD)
 

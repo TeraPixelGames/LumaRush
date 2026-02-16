@@ -38,6 +38,7 @@ var _hint_tween: Tween
 var _hint_group: Array = []
 var _tile_gap_px: float = 8.0
 var _prism_pick_mode: bool = false
+var _theme_tile_palette: Array = []
 
 func _ready() -> void:
 	_tile_gap_px = _gap_for_tile_size(tile_size)
@@ -74,6 +75,13 @@ func set_prism_pick_mode(enabled: bool) -> void:
 
 func is_prism_pick_mode() -> bool:
 	return _prism_pick_mode
+
+func set_theme_palette(theme_palette: Array) -> void:
+	_theme_tile_palette = theme_palette.duplicate(true)
+	colors = _palette_size()
+	if board:
+		_normalize_board_color_ids()
+		_refresh_tiles()
 
 func _gap_for_tile_size(size: float) -> float:
 	return clamp(size * 0.08, 7.0, 11.0)
@@ -385,6 +393,8 @@ func _palette_size() -> int:
 	return _tile_palette().size()
 
 func _tile_palette() -> Array:
+	if _theme_tile_palette.size() >= 3:
+		return _theme_tile_palette
 	return TILE_PALETTE_LEGACY if FeatureFlags.tile_design_mode() == FeatureFlags.TileDesignMode.LEGACY else TILE_PALETTE_MODERN
 
 func _apply_tile_design_shader_profile(mat: ShaderMaterial) -> void:
