@@ -132,6 +132,7 @@ If the Terapixel auth URL is unset, Nakama auth proceeds without external verifi
 - `tpx_account_merge_code`: creates pairing code for current user.
 - `tpx_account_merge_redeem`: redeems pairing code and merges account into primary.
 - `tpx_account_magic_link_status`: reads completion state pushed from platform.
+- `tpx_account_magic_link_notify`: platform callback endpoint (shared-secret protected; enforces `game_id` when provided).
 - `tpx_account_username_status`: returns current username + free/paid rename policy.
 - `tpx_account_update_username`: validates and updates username (first change free, then coins).
 

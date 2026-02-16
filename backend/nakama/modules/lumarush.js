@@ -226,10 +226,11 @@ function rpcSubmitScore(ctx, logger, nk, payload) {
     metadata = {};
   }
 
+  var currentUsername = resolveCurrentUsername(nk, ctx);
   var record = nk.leaderboardRecordWrite(
     MODULE_CONFIG.leaderboardId,
     ctx.userId,
-    ctx.username || "",
+    currentUsername,
     score,
     subscore,
     metadata,
@@ -256,6 +257,26 @@ function rpcSubmitScore(ctx, logger, nk, payload) {
     leaderboardId: MODULE_CONFIG.leaderboardId,
     record: record,
   });
+}
+
+function resolveCurrentUsername(nk, ctx) {
+  var fallback = String((ctx && ctx.username) || "").trim();
+  if (!ctx || !ctx.userId) {
+    return fallback;
+  }
+  try {
+    var users = nk.usersGetId([ctx.userId]);
+    if (users && users.length > 0) {
+      var user = users[0] || {};
+      var liveUsername = String(user.username || "").trim();
+      if (liveUsername) {
+        return liveUsername;
+      }
+    }
+  } catch (_err) {
+    // Fall back to session username if user lookup fails.
+  }
+  return fallback;
 }
 
 function rpcGetMyHighScore(ctx, logger, nk, payload) {
@@ -740,6 +761,10 @@ function rpcAccountMagicLinkNotify(ctx, logger, nk, payload) {
   var userId = String(data.nakama_user_id || data.profile_id || "").trim();
   if (!userId) {
     throw new Error("profile_id is required");
+  }
+  var incomingGameId = String(data.game_id || "").trim().toLowerCase();
+  if (incomingGameId && incomingGameId !== String(MODULE_CONFIG.gameId || "").trim().toLowerCase()) {
+    throw new Error("game_id mismatch");
   }
   var status = String(data.status || "").trim().toLowerCase();
   if (!status) {
