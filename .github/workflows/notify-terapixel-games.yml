@@ -3,6 +3,9 @@ name: Notify terapixel.games
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: ["Deploy Godot Web To Pages"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       release_tag:
@@ -15,6 +18,7 @@ permissions:
 
 jobs:
   dispatch:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch update event
@@ -24,6 +28,7 @@ jobs:
           INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
           RELEASE_TAG_FROM_EVENT: ${{ github.event.release.tag_name }}
           RELEASE_TARGET_SHA: ${{ github.event.release.target_commitish }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           SHA: ${{ github.sha }}
         run: |
           if [ -z "$DISPATCH_TOKEN" ]; then
@@ -51,6 +56,9 @@ jobs:
           VERSION="${RELEASE_TAG#v}"
           RELEASE_ASSET="lumarush-web-${VERSION}.zip"
           SOURCE_SHA="$RELEASE_TARGET_SHA"
+          if [ -z "$SOURCE_SHA" ]; then
+            SOURCE_SHA="$WORKFLOW_RUN_HEAD_SHA"
+          fi
           if [ -z "$SOURCE_SHA" ]; then
             SOURCE_SHA="$SHA"
           fi
