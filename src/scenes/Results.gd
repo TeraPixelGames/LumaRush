@@ -12,6 +12,7 @@ func _ready() -> void:
 	MusicManager.fade_to_calm(0.6)
 	VisualTestMode.apply_if_enabled($BackgroundController, $BackgroundController)
 	Typography.style_results(self)
+	_refresh_intro_pivots()
 	_update_labels()
 	_bind_online_signals()
 	_sync_online_results()
@@ -60,6 +61,14 @@ func _play_intro() -> void:
 	t.tween_property(play_again, "modulate:a", 1.0, 0.16)
 	t.tween_property(menu, "modulate:a", 1.0, 0.16)
 
+func _refresh_intro_pivots() -> void:
+	var panel: Control = $UI/Panel
+	var box: Control = $UI/VBox
+	if panel:
+		panel.pivot_offset = panel.size * 0.5
+	if box:
+		box.pivot_offset = box.size * 0.5
+
 func _bind_online_signals() -> void:
 	if not NakamaService.online_state_changed.is_connected(_on_online_state_changed):
 		NakamaService.online_state_changed.connect(_on_online_state_changed)
@@ -103,3 +112,4 @@ func _format_leaderboard(records: Array) -> String:
 func _notification(what: int) -> void:
 	if what == Control.NOTIFICATION_RESIZED:
 		Typography.style_results(self)
+		_refresh_intro_pivots()

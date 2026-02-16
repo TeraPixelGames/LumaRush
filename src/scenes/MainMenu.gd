@@ -22,7 +22,7 @@ func _ready() -> void:
 		$BackgroundController.call("set_menu_emission_persistent", true)
 	VisualTestMode.apply_if_enabled($BackgroundController, $BackgroundController)
 	Typography.style_main_menu(self)
-	call_deferred("_refresh_title_pivot")
+	call_deferred("_refresh_title_pivots")
 	title_label.add_theme_color_override("font_color", _title_base_color)
 	_populate_track_options()
 
@@ -38,12 +38,14 @@ func _process(delta: float) -> void:
 func _notification(what: int) -> void:
 	if what == Control.NOTIFICATION_RESIZED:
 		Typography.style_main_menu(self)
-		_refresh_title_pivot()
+		_refresh_title_pivots()
 
-func _refresh_title_pivot() -> void:
+func _refresh_title_pivots() -> void:
 	if title_label == null:
 		return
 	title_label.pivot_offset = title_label.size * 0.5
+	if track_name:
+		track_name.pivot_offset = track_name.size * 0.5
 
 func _on_start_pressed() -> void:
 	RunManager.start_game()
@@ -81,6 +83,8 @@ func _refresh_track_name(animated: bool, direction: int = 1) -> void:
 		track_name.text = ""
 		return
 	track_name.text = str(_tracks[_track_index].get("name", "Track"))
+	if track_name:
+		track_name.pivot_offset = track_name.size * 0.5
 	if not animated:
 		track_name.modulate = Color(1, 1, 1, 1)
 		track_name.scale = Vector2.ONE
