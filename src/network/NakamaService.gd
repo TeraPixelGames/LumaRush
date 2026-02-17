@@ -106,8 +106,55 @@ func has_entitlement(entitlement_key: String) -> bool:
 func is_guest_account() -> bool:
 	return SaveStore.get_terapixel_user_id().is_empty()
 
+func is_linked_account() -> bool:
+	return not SaveStore.get_terapixel_user_id().is_empty()
+
+func get_linked_email() -> String:
+	return SaveStore.get_terapixel_email().strip_edges().to_lower()
+
+func set_linked_email(email: String) -> void:
+	var normalized := email.strip_edges().to_lower()
+	if normalized.is_empty():
+		return
+	SaveStore.set_terapixel_email(normalized)
+
 func set_terapixel_identity(user_id: String, display_name: String = "") -> void:
 	SaveStore.set_terapixel_identity(user_id, display_name)
+
+func logout() -> Dictionary:
+	var had_linked_account := is_linked_account()
+	SaveStore.clear_terapixel_identity()
+	_session_token = ""
+	_refresh_token = ""
+	_user_id = ""
+	_username = ""
+	_is_authenticated = false
+	auth_state_changed.emit(false, "")
+
+	if not _connect_enabled:
+		_set_online_state("Online disabled")
+		return {"ok": true, "linked_cleared": had_linked_account, "authenticated": false}
+
+	_set_online_state("Connecting...")
+	var device_result: Dictionary = await _authenticate_device()
+	if not device_result.get("ok", false):
+		_set_online_state("Offline")
+		auth_state_changed.emit(false, "")
+		return {
+			"ok": false,
+			"linked_cleared": had_linked_account,
+			"error": "device auth failed",
+			"details": device_result,
+		}
+
+	_is_authenticated = true
+	_set_online_state("Connected")
+	auth_state_changed.emit(true, _user_id)
+	await refresh_my_high_score()
+	await refresh_leaderboard(_leaderboard_limit)
+	await refresh_entitlements(true)
+	await refresh_wallet(true)
+	return {"ok": true, "linked_cleared": had_linked_account, "authenticated": true}
 
 func upgrade_guest_to_full_profile(terapixel_user_id: String, display_name: String = "", custom_id: String = "") -> Dictionary:
 	var tpx_user_id := terapixel_user_id.strip_edges()
@@ -175,7 +222,7 @@ func ensure_authenticated() -> bool:
 		return true
 
 	_set_online_state("Connecting...")
-	var result: Dictionary = await _authenticate_device()
+	var result: Dictionary = await _authenticate_preferred()
 	if not result.get("ok", false):
 		_set_online_state("Offline")
 		_is_authenticated = false
@@ -433,7 +480,9 @@ func complete_magic_link(ml_token: String) -> Dictionary:
 	var payload := {"ml_token": ml_token.strip_edges()}
 	var rpc: Dictionary = await _rpc_call("tpx_account_magic_link_complete", payload, true, true)
 	if rpc.get("ok", false):
-		await refresh_wallet(true)
+		var data: Variant = rpc.get("data", {})
+		if typeof(data) == TYPE_DICTIONARY and _is_magic_link_completion_payload(data as Dictionary):
+			await _handle_magic_link_completion(data as Dictionary)
 	return rpc
 
 func get_magic_link_status(clear_after_read: bool = true) -> Dictionary:
@@ -447,8 +496,7 @@ func get_magic_link_status(clear_after_read: bool = true) -> Dictionary:
 	if typeof(data) == TYPE_DICTIONARY:
 		var row: Dictionary = data
 		if bool(row.get("completed", false)):
-			await refresh_wallet(true)
-			profile_upgraded.emit(true, str(row.get("status", "ok")))
+			await _handle_magic_link_completion(row)
 	return rpc
 
 func create_account_merge_code() -> Dictionary:
@@ -484,6 +532,38 @@ func update_username(new_username: String) -> Dictionary:
 			await refresh_wallet(false)
 	return rpc
 
+func _authenticate_preferred() -> Dictionary:
+	var terapixel_user_id := SaveStore.get_terapixel_user_id().strip_edges()
+	if not terapixel_user_id.is_empty():
+		var custom_result: Dictionary = await _authenticate_custom(terapixel_user_id, true)
+		if custom_result.get("ok", false):
+			custom_result["provider"] = "custom"
+			return custom_result
+	var device_result: Dictionary = await _authenticate_device()
+	if device_result.get("ok", false):
+		device_result["provider"] = "device"
+	return device_result
+
+func _authenticate_custom(terapixel_user_id: String, create_if_missing: bool = true) -> Dictionary:
+	var cleaned_id := terapixel_user_id.strip_edges()
+	if cleaned_id.is_empty():
+		return {"ok": false, "error": "missing terapixel_user_id"}
+	var custom_id := "tpx:%s" % cleaned_id
+	var auth_body := {
+		"id": custom_id,
+		"vars": _build_auth_vars(),
+	}
+	var create_value := "true" if create_if_missing else "false"
+	var response: Dictionary = await _request_json(
+		HTTPClient.METHOD_POST,
+		"/v2/account/authenticate/custom?create=%s" % create_value,
+		JSON.stringify(auth_body),
+		_basic_auth_headers()
+	)
+	if not response.get("ok", false):
+		return response
+	return await _hydrate_auth_session(response)
+
 func _authenticate_device() -> Dictionary:
 	var device_id: String = SaveStore.get_or_create_nakama_device_id()
 	var username: String = _resolve_display_name()
@@ -500,8 +580,10 @@ func _authenticate_device() -> Dictionary:
 	)
 	if not response.get("ok", false):
 		return response
+	return await _hydrate_auth_session(response)
 
-	var data: Variant = response.get("data", {})
+func _hydrate_auth_session(auth_response: Dictionary) -> Dictionary:
+	var data: Variant = auth_response.get("data", {})
 	if typeof(data) != TYPE_DICTIONARY:
 		return {"ok": false, "error": "invalid auth response"}
 
@@ -527,6 +609,40 @@ func _authenticate_device() -> Dictionary:
 			_username = str(user_obj.get("username", ""))
 			SaveStore.set_nakama_user_id(_user_id)
 	return {"ok": true}
+
+func _handle_magic_link_completion(data: Dictionary) -> void:
+	var status := str(data.get("status", data.get("link_status", "ok")))
+	var linked_profile_id := _extract_magic_link_profile_id(data)
+	var linked_email := str(data.get("email", "")).strip_edges().to_lower()
+	if not linked_email.is_empty():
+		SaveStore.set_terapixel_email(linked_email)
+	if not linked_profile_id.is_empty():
+		SaveStore.set_terapixel_identity(
+			linked_profile_id,
+			SaveStore.get_terapixel_display_name(),
+			linked_email
+		)
+		var switch_result: Dictionary = await _authenticate_custom(linked_profile_id)
+		if switch_result.get("ok", false):
+			_is_authenticated = true
+			auth_state_changed.emit(true, _user_id)
+	await refresh_my_high_score()
+	await refresh_leaderboard(_leaderboard_limit)
+	await refresh_entitlements(true)
+	await refresh_wallet(true)
+	profile_upgraded.emit(true, status)
+
+func _extract_magic_link_profile_id(data: Dictionary) -> String:
+	var primary := str(data.get("primaryProfileId", data.get("primary_profile_id", ""))).strip_edges()
+	if not primary.is_empty():
+		return primary
+	return str(data.get("secondaryProfileId", data.get("secondary_profile_id", ""))).strip_edges()
+
+func _is_magic_link_completion_payload(data: Dictionary) -> bool:
+	if bool(data.get("completed", false)):
+		return true
+	var status := str(data.get("status", data.get("link_status", ""))).strip_edges().to_lower()
+	return not status.is_empty() and status != "pending"
 
 func _rpc_call(rpc_id: String, payload: Dictionary, requires_auth: bool, retry_on_unauthorized: bool) -> Dictionary:
 	var path := "/v2/rpc/%s" % rpc_id

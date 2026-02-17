@@ -2,21 +2,39 @@ extends Control
 
 @onready var status_label: Label = $Panel/VBox/Status
 @onready var email_input: LineEdit = $Panel/VBox/Email
+@onready var send_magic_link_button: Button = $Panel/VBox/SendMagicLink
 @onready var merge_code_input: LineEdit = $Panel/VBox/MergeCode
 @onready var username_input: LineEdit = $Panel/VBox/Username
 @onready var username_button: Button = $Panel/VBox/UpdateUsername
 
 var _polling_magic_link := false
 var _username_cost := 0
+var _magic_link_token := ""
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	Typography.style_save_streak(self)
 	ThemeManager.apply_to_scene(get_tree().current_scene)
 	username_input.text = NakamaService.get_username()
+	_refresh_account_controls()
+	if not NakamaService.auth_state_changed.is_connected(_on_auth_state_changed):
+		NakamaService.auth_state_changed.connect(_on_auth_state_changed)
 	_refresh_username_policy()
 
 func _on_send_magic_link_pressed() -> void:
+	if NakamaService.is_linked_account():
+		status_label.text = "Logging out..."
+		var logout_result: Dictionary = await NakamaService.logout()
+		if not logout_result.get("ok", false):
+			status_label.text = _extract_error_message(logout_result, "Logout failed. Please try again.")
+			return
+		_polling_magic_link = false
+		_magic_link_token = ""
+		email_input.text = ""
+		status_label.text = "Logged out. You are on a guest profile."
+		_refresh_account_controls()
+		return
+
 	var email := email_input.text.strip_edges().to_lower()
 	if email.is_empty():
 		status_label.text = "Enter an email address."
@@ -24,12 +42,13 @@ func _on_send_magic_link_pressed() -> void:
 	status_label.text = "Sending magic link..."
 	var result: Dictionary = await NakamaService.start_magic_link(email)
 	if not result.get("ok", false):
-		status_label.text = "Magic link unavailable."
+		status_label.text = _extract_error_message(result, "Magic link unavailable.")
 		return
+	_magic_link_token = _extract_magic_link_token(result)
 	status_label.text = "Magic link sent. Check your email."
 	if not _polling_magic_link:
 		_polling_magic_link = true
-		_poll_magic_link_completion()
+		_poll_magic_link_completion(_magic_link_token)
 
 func _on_create_merge_code_pressed() -> void:
 	status_label.text = "Creating merge code..."
@@ -82,22 +101,57 @@ func _on_update_username_pressed() -> void:
 		status_label.text = "Username unchanged."
 	_refresh_username_policy()
 
-func _poll_magic_link_completion() -> void:
+func _poll_magic_link_completion(ml_token: String = "") -> void:
 	var attempts := 0
 	while is_inside_tree() and _polling_magic_link and attempts < 20:
 		attempts += 1
+		if not ml_token.is_empty():
+			var complete_result: Dictionary = await NakamaService.complete_magic_link(ml_token)
+			if complete_result.get("ok", false):
+				var complete_data: Dictionary = complete_result.get("data", {})
+				var complete_status := str(complete_data.get("status", complete_data.get("link_status", ""))).strip_edges().to_lower()
+				var completed := bool(complete_data.get("completed", false)) or (not complete_status.is_empty() and complete_status != "pending")
+				if completed:
+					if complete_status.is_empty():
+						complete_status = "ok"
+					status_label.text = "Magic link completed: %s" % complete_status
+					_polling_magic_link = false
+					_refresh_account_controls()
+					return
 		var result: Dictionary = await NakamaService.get_magic_link_status(true)
 		if result.get("ok", false):
 			var data: Dictionary = result.get("data", {})
 			if bool(data.get("completed", false)):
-				var status := str(data.get("status", "ok"))
+				var status := str(data.get("status", data.get("link_status", "ok")))
 				status_label.text = "Magic link completed: %s" % status
 				_polling_magic_link = false
+				_refresh_account_controls()
 				return
 		await get_tree().create_timer(3.0).timeout
 	if _polling_magic_link:
 		status_label.text = "Waiting for email link click..."
 	_polling_magic_link = false
+
+func _refresh_account_controls() -> void:
+	var linked := NakamaService.is_linked_account()
+	if linked:
+		var linked_email := NakamaService.get_linked_email()
+		if linked_email.is_empty():
+			linked_email = email_input.text.strip_edges().to_lower()
+			if not linked_email.is_empty():
+				NakamaService.set_linked_email(linked_email)
+		if not linked_email.is_empty():
+			email_input.text = linked_email
+		email_input.editable = false
+		send_magic_link_button.text = "Logout"
+	else:
+		email_input.editable = true
+		send_magic_link_button.text = "Send Magic Link"
+
+func _on_auth_state_changed(_is_authenticated: bool, _user_id: String) -> void:
+	if not is_inside_tree():
+		return
+	_refresh_account_controls()
 
 func _refresh_username_policy() -> void:
 	var result: Dictionary = await NakamaService.get_username_status()
@@ -126,5 +180,19 @@ func _extract_error_message(result: Dictionary, fallback: String) -> String:
 		if row.has("message"):
 			return str(row.get("message"))
 		if row.has("error"):
-			return str(row.get("error"))
+			var err: Variant = row.get("error")
+			if typeof(err) == TYPE_DICTIONARY:
+				var err_row: Dictionary = err
+				if err_row.has("message"):
+					return str(err_row.get("message"))
+				if err_row.has("code"):
+					return str(err_row.get("code"))
+			return str(err)
 	return fallback
+
+func _extract_magic_link_token(result: Dictionary) -> String:
+	var data_var: Variant = result.get("data", {})
+	if typeof(data_var) != TYPE_DICTIONARY:
+		return ""
+	var data: Dictionary = data_var
+	return str(data.get("ml_token", data.get("magic_link_token", data.get("token", "")))).strip_edges()

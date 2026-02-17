@@ -7,6 +7,10 @@ var SHOP_COLLECTION = "lumarush_player_shop";
 var SHOP_KEY = "state";
 var ACCOUNT_COLLECTION = "lumarush_player_account";
 var MAGIC_LINK_STATUS_KEY = "magic_link_status";
+var MAGIC_LINK_PENDING_KEY = "magic_link_pending";
+var MAGIC_LINK_EMAIL_LOOKUP_KEY_PREFIX = "magic_link_email_lookup_";
+var MAGIC_LINK_PROFILE_LOOKUP_KEY_PREFIX = "magic_link_profile_lookup_";
+var SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000";
 var USERNAME_STATE_KEY = "username_state";
 var USERNAME_AUDIT_KEY = "username_audit";
 var DEFAULT_USERNAME_CHANGE_COST_COINS = 300;
@@ -726,14 +730,22 @@ function rpcAccountMagicLinkStart(ctx, logger, nk, payload) {
   if (!email) {
     throw new Error("email is required");
   }
-  if (!MODULE_CONFIG.accountMagicLinkStartUrl) {
+  var startUrl =
+    MODULE_CONFIG.accountMagicLinkStartUrl ||
+    ((ctx && ctx.env && ctx.env.TPX_PLATFORM_MAGIC_LINK_START_URL) || "");
+  if (!startUrl) {
     throw new Error("magic link start URL is not configured");
   }
   clearMagicLinkStatus(nk, ctx.userId);
+  writeMagicLinkPending(nk, ctx.userId, {
+    email: email,
+    startedAt: Math.floor(Date.now() / 1000),
+  });
+  writeMagicLinkLookupByEmail(nk, email, ctx.userId);
   var platformSession = exchangePlatformSession(ctx, nk);
   var response = platformPost(
     nk,
-    MODULE_CONFIG.accountMagicLinkStartUrl,
+    startUrl,
     {
       email: email,
       game_id: MODULE_CONFIG.gameId,
@@ -743,7 +755,7 @@ function rpcAccountMagicLinkStart(ctx, logger, nk, payload) {
     platformSession
   );
   if (response.code < 200 || response.code >= 300) {
-    throw new Error("failed to start magic link");
+    throw new Error("failed to start magic link: " + extractHttpErrorDetail(response));
   }
   var parsed = parseHttpResponseJson(response.body);
   return JSON.stringify(parsed || { ok: true });
@@ -756,13 +768,16 @@ function rpcAccountMagicLinkComplete(ctx, logger, nk, payload) {
   if (!token) {
     throw new Error("ml_token is required");
   }
-  if (!MODULE_CONFIG.accountMagicLinkCompleteUrl) {
+  var completeUrl =
+    MODULE_CONFIG.accountMagicLinkCompleteUrl ||
+    ((ctx && ctx.env && ctx.env.TPX_PLATFORM_MAGIC_LINK_COMPLETE_URL) || "");
+  if (!completeUrl) {
     throw new Error("magic link complete URL is not configured");
   }
   var platformSession = exchangePlatformSession(ctx, nk);
   var response = platformPost(
     nk,
-    MODULE_CONFIG.accountMagicLinkCompleteUrl,
+    completeUrl,
     {
       ml_token: token,
     },
@@ -770,7 +785,7 @@ function rpcAccountMagicLinkComplete(ctx, logger, nk, payload) {
     platformSession
   );
   if (response.code < 200 || response.code >= 300) {
-    throw new Error("failed to complete magic link");
+    throw new Error("failed to complete magic link: " + extractHttpErrorDetail(response));
   }
   return JSON.stringify(parseHttpResponseJson(response.body) || {});
 }
@@ -788,6 +803,10 @@ function rpcAccountMagicLinkStatus(ctx, logger, nk, payload) {
   }
   if (clearAfterRead) {
     clearMagicLinkStatus(nk, ctx.userId);
+    clearMagicLinkPending(nk, ctx.userId);
+    if (status.email) {
+      clearMagicLinkLookupByEmail(nk, String(status.email || "").trim().toLowerCase());
+    }
   }
   return JSON.stringify({
     pending: false,
@@ -802,35 +821,51 @@ function rpcAccountMagicLinkStatus(ctx, logger, nk, payload) {
 }
 
 function rpcAccountMagicLinkNotify(ctx, logger, nk, payload) {
-  var data = parsePayload(payload);
-  if (!MODULE_CONFIG.magicLinkNotifySecret) {
-    throw new Error("magic link notify secret is not configured");
+  var data = {};
+  try {
+    data = parsePayload(payload);
+  } catch (err) {
+    logger.warn("magic_link_notify rejected: invalid payload err=%s", String(err || ""));
+    throw err;
+  }
+  var expectedSecret =
+    String(MODULE_CONFIG.magicLinkNotifySecret || "").trim() ||
+    String((ctx && ctx.env && ctx.env.TPX_MAGIC_LINK_NOTIFY_SECRET) || "").trim();
+  if (!expectedSecret) {
+    logger.error("magic_link_notify rejected: notify secret is not configured (env=TPX_MAGIC_LINK_NOTIFY_SECRET)");
+    throw new Error("magic link notify secret is not configured (set TPX_MAGIC_LINK_NOTIFY_SECRET)");
   }
   var providedSecret = String(data.secret || "").trim();
-  if (!providedSecret || providedSecret !== MODULE_CONFIG.magicLinkNotifySecret) {
+  if (!providedSecret || providedSecret !== expectedSecret) {
     throw new Error("invalid notify secret");
   }
-  var userId = String(data.nakama_user_id || data.profile_id || "").trim();
+  var incomingEmail = String(data.email || "").trim().toLowerCase();
+  var resolved = resolveMagicLinkNotifyTarget(nk, data, incomingEmail);
+  var userId = resolved.userId;
   if (!userId) {
-    throw new Error("profile_id is required");
+    throw new Error("nakama_user_id is required");
   }
-  var incomingGameId = String(data.game_id || "").trim().toLowerCase();
+  var incomingGameId = String(data.game_id || data.gameId || "").trim().toLowerCase();
   if (incomingGameId && incomingGameId !== String(MODULE_CONFIG.gameId || "").trim().toLowerCase()) {
     throw new Error("game_id mismatch");
   }
-  var status = String(data.status || "").trim().toLowerCase();
+  var status = String(data.status || data.link_status || "").trim().toLowerCase();
   if (!status) {
     throw new Error("status is required");
   }
   var row = {
     status: status,
-    email: String(data.email || "").trim().toLowerCase(),
-    primaryProfileId: String(data.primary_profile_id || "").trim(),
-    secondaryProfileId: String(data.secondary_profile_id || "").trim(),
-    completedAt: toInt(data.completed_at, Math.floor(Date.now() / 1000)),
+    email: incomingEmail,
+    primaryProfileId: String(data.primary_profile_id || data.primaryProfileId || "").trim(),
+    secondaryProfileId: String(data.secondary_profile_id || data.secondaryProfileId || "").trim(),
+    completedAt: toInt(data.completed_at || data.completedAt, Math.floor(Date.now() / 1000)),
     receivedAt: Math.floor(Date.now() / 1000),
   };
   writeMagicLinkStatus(nk, userId, row);
+  clearMagicLinkPending(nk, userId);
+  if (row.email) {
+    clearMagicLinkLookupByEmail(nk, row.email);
+  }
   return JSON.stringify({
     ok: true,
     userId: userId,
@@ -1121,12 +1156,15 @@ function persistIapSnapshot(nk, userId, entitlements) {
 }
 
 function exchangePlatformSession(ctx, nk) {
-  if (!MODULE_CONFIG.identityNakamaAuthUrl) {
+  var authUrl =
+    MODULE_CONFIG.identityNakamaAuthUrl ||
+    ((ctx && ctx.env && ctx.env.TPX_PLATFORM_IDENTITY_NAKAMA_AUTH_URL) || "");
+  if (!authUrl) {
     throw new Error("identity exchange URL is not configured");
   }
   var response = platformPost(
     nk,
-    MODULE_CONFIG.identityNakamaAuthUrl,
+    authUrl,
     {
       game_id: MODULE_CONFIG.gameId,
       nakama_user_id: ctx.userId,
@@ -1141,6 +1179,10 @@ function exchangePlatformSession(ctx, nk) {
   var parsed = parseHttpResponseJson(response.body);
   if (!parsed.session_token) {
     throw new Error("identity exchange missing session token");
+  }
+  var platformProfileId = String(parsed.player_id || parsed.playerId || "").trim();
+  if (platformProfileId && ctx && ctx.userId) {
+    writeMagicLinkLookupByProfile(nk, platformProfileId, ctx.userId);
   }
   return String(parsed.session_token);
 }
@@ -1202,11 +1244,123 @@ function parseHttpResponseJson(body) {
   return parsed;
 }
 
+function extractHttpErrorDetail(response) {
+  var code = toInt(response && response.code, 0);
+  var parsed = {};
+  try {
+    parsed = parseHttpResponseJson(response && response.body);
+  } catch (_err) {
+    parsed = {};
+  }
+  var message = "";
+  if (parsed && parsed.error && parsed.error.message) {
+    message = String(parsed.error.message);
+  } else if (parsed && parsed.message) {
+    message = String(parsed.message);
+  } else if (response && response.body) {
+    message = String(response.body);
+  }
+  message = message.trim();
+  if (message.length > 220) {
+    message = message.substring(0, 220) + "...";
+  }
+  if (message) {
+    return "[" + code + "] " + message;
+  }
+  return "status " + code;
+}
+
 function normalizeObject(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return {};
   }
   return input;
+}
+
+function resolveMagicLinkNotifyTarget(nk, data, incomingEmail) {
+  var explicit = String(data.nakama_user_id || data.nakamaUserId || "").trim();
+  if (explicit && isExistingNakamaUserId(nk, explicit)) {
+    return { userId: explicit, source: "explicit_nakama_user_id" };
+  }
+  var profileCandidates = resolveMagicLinkNotifyProfileCandidates(data);
+  for (var i = 0; i < profileCandidates.length; i++) {
+    var byProfile = readMagicLinkLookupByProfile(nk, profileCandidates[i]);
+    var resolvedByProfile = resolveStoredNakamaUserId(nk, byProfile);
+    if (resolvedByProfile) {
+      return { userId: resolvedByProfile, source: "profile_lookup" };
+    }
+  }
+  for (var j = 0; j < profileCandidates.length; j++) {
+    if (isExistingNakamaUserId(nk, profileCandidates[j])) {
+      return { userId: profileCandidates[j], source: "profile_field" };
+    }
+  }
+  if (incomingEmail) {
+    var byEmail = readMagicLinkLookupByEmail(nk, incomingEmail);
+    var resolvedByEmail = resolveStoredNakamaUserId(nk, byEmail);
+    if (resolvedByEmail) {
+      return { userId: resolvedByEmail, source: "email_lookup" };
+    }
+  }
+  return { userId: "", source: "unresolved" };
+}
+
+function resolveMagicLinkNotifyProfileCandidates(data) {
+  var candidates = [
+    data.profile_id,
+    data.profileId,
+    data.secondary_profile_id,
+    data.secondaryProfileId,
+    data.primary_profile_id,
+    data.primaryProfileId,
+  ];
+  var out = [];
+  var seen = {};
+  for (var i = 0; i < candidates.length; i++) {
+    var candidate = String(candidates[i] || "").trim();
+    if (!candidate) {
+      continue;
+    }
+    var key = candidate.toLowerCase();
+    if (seen[key]) {
+      continue;
+    }
+    seen[key] = true;
+    out.push(candidate);
+  }
+  return out;
+}
+
+function resolveStoredNakamaUserId(nk, userId) {
+  var candidate = String(userId || "").trim();
+  if (!candidate) {
+    return "";
+  }
+  if (isExistingNakamaUserId(nk, candidate)) {
+    return candidate;
+  }
+  if (isLikelyNakamaUserId(candidate)) {
+    return candidate;
+  }
+  return "";
+}
+
+function isLikelyNakamaUserId(value) {
+  var text = String(value || "").trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text);
+}
+
+function isExistingNakamaUserId(nk, userId) {
+  var candidate = String(userId || "").trim();
+  if (!isLikelyNakamaUserId(candidate)) {
+    return false;
+  }
+  try {
+    var users = nk.usersGetId([candidate]);
+    return !!(users && users.length > 0 && users[0] && users[0].id);
+  } catch (_err) {
+    return false;
+  }
 }
 
 function asArray(value) {
@@ -1304,6 +1458,151 @@ function writeShopState(nk, userId, state) {
       value: state,
       permissionRead: 1,
       permissionWrite: 0,
+    },
+  ]);
+}
+
+function magicLinkLookupKeyByEmail(email) {
+  var normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+  var safe = normalized.replace(/[^a-z0-9_-]/g, "_");
+  if (!safe) {
+    return "";
+  }
+  if (safe.length > 96) {
+    safe = safe.substring(0, 96);
+  }
+  return MAGIC_LINK_EMAIL_LOOKUP_KEY_PREFIX + safe;
+}
+
+function magicLinkLookupKeyByProfile(profileId) {
+  var normalized = String(profileId || "").trim().toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+  var safe = normalized.replace(/[^a-z0-9_-]/g, "_");
+  if (!safe) {
+    return "";
+  }
+  if (safe.length > 96) {
+    safe = safe.substring(0, 96);
+  }
+  return MAGIC_LINK_PROFILE_LOOKUP_KEY_PREFIX + safe;
+}
+
+function writeMagicLinkLookupByEmail(nk, email, userId) {
+  var key = magicLinkLookupKeyByEmail(email);
+  if (!key) {
+    return;
+  }
+  nk.storageWrite([
+    {
+      collection: ACCOUNT_COLLECTION,
+      key: key,
+      userId: SYSTEM_USER_ID,
+      value: {
+        email: String(email || "").trim().toLowerCase(),
+        userId: String(userId || "").trim(),
+        updatedAt: Math.floor(Date.now() / 1000),
+      },
+      permissionRead: 0,
+      permissionWrite: 0,
+    },
+  ]);
+}
+
+function writeMagicLinkLookupByProfile(nk, profileId, userId) {
+  var key = magicLinkLookupKeyByProfile(profileId);
+  if (!key) {
+    return;
+  }
+  nk.storageWrite([
+    {
+      collection: ACCOUNT_COLLECTION,
+      key: key,
+      userId: SYSTEM_USER_ID,
+      value: {
+        profileId: String(profileId || "").trim().toLowerCase(),
+        userId: String(userId || "").trim(),
+        updatedAt: Math.floor(Date.now() / 1000),
+      },
+      permissionRead: 0,
+      permissionWrite: 0,
+    },
+  ]);
+}
+
+function readMagicLinkLookupByEmail(nk, email) {
+  var key = magicLinkLookupKeyByEmail(email);
+  if (!key) {
+    return "";
+  }
+  var storage = nk.storageRead([
+    {
+      collection: ACCOUNT_COLLECTION,
+      key: key,
+      userId: SYSTEM_USER_ID,
+    },
+  ]);
+  if (storage && storage.length > 0 && storage[0].value) {
+    return String(storage[0].value.userId || "").trim();
+  }
+  return "";
+}
+
+function readMagicLinkLookupByProfile(nk, profileId) {
+  var key = magicLinkLookupKeyByProfile(profileId);
+  if (!key) {
+    return "";
+  }
+  var storage = nk.storageRead([
+    {
+      collection: ACCOUNT_COLLECTION,
+      key: key,
+      userId: SYSTEM_USER_ID,
+    },
+  ]);
+  if (storage && storage.length > 0 && storage[0].value) {
+    return String(storage[0].value.userId || "").trim();
+  }
+  return "";
+}
+
+function clearMagicLinkLookupByEmail(nk, email) {
+  var key = magicLinkLookupKeyByEmail(email);
+  if (!key) {
+    return;
+  }
+  nk.storageDelete([
+    {
+      collection: ACCOUNT_COLLECTION,
+      key: key,
+      userId: SYSTEM_USER_ID,
+    },
+  ]);
+}
+
+function writeMagicLinkPending(nk, userId, value) {
+  nk.storageWrite([
+    {
+      collection: ACCOUNT_COLLECTION,
+      key: MAGIC_LINK_PENDING_KEY,
+      userId: userId,
+      value: value || {},
+      permissionRead: 0,
+      permissionWrite: 0,
+    },
+  ]);
+}
+
+function clearMagicLinkPending(nk, userId) {
+  nk.storageDelete([
+    {
+      collection: ACCOUNT_COLLECTION,
+      key: MAGIC_LINK_PENDING_KEY,
+      userId: userId,
     },
   ]);
 }
