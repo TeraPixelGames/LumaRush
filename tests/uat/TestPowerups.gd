@@ -50,9 +50,11 @@ func test_depleted_button_reward_grants_that_powerup() -> void:
 	var game: Control = await _spawn_game()
 	var undo_badge: Label = game.get_node("UI/Powerups/Undo/Badge") as Label
 	assert_that(undo_badge.text).contains("Watch Ad")
-	game._on_undo_pressed()
-	await get_tree().process_frame
-	await get_tree().process_frame
+	await game._on_undo_pressed()
+	for _i in range(120):
+		await get_tree().process_frame
+		if undo_badge.text.contains("x1"):
+			break
 	assert_that(undo_badge.text).contains("x1")
 	game.queue_free()
 	await get_tree().process_frame
