@@ -16,6 +16,8 @@ services:
     restart: unless-stopped
     depends_on:
       - cockroachdb
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     entrypoint:
       - "/bin/sh"
       - "-ecx"

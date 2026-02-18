@@ -17,7 +17,11 @@ This folder provides a local Nakama backend for LumaRush with:
 ## Run Locally
 
 1. `cd backend/nakama`
-2. `docker compose up --build`
+2. Start platform dependencies in another terminal:
+   - `cd c:\code\terapixel-platform`
+   - `SESSION_SECRET=<your-secret> CRAZYGAMES_EXPECTED_AUDIENCE=lumarush npm run start:identity`
+   - `SESSION_SECRET=<your-secret> npm run start:iap`
+3. `docker compose up --build`
 
 Nakama ports:
 
@@ -34,6 +38,7 @@ Set these in `backend/nakama/local.yml` under `runtime.env`:
 - `TPX_PLATFORM_IDENTITY_NAKAMA_AUTH_URL`: `POST /v1/auth/nakama`
 - `TPX_PLATFORM_IAP_VERIFY_URL`: `POST /v1/iap/verify`
 - `TPX_PLATFORM_IAP_ENTITLEMENTS_URL`: `GET /v1/iap/entitlements`
+- `TPX_PLATFORM_IAP_COINS_ADJUST_URL`: `POST /v1/iap/coins/adjust`
 - `TPX_PLATFORM_ACCOUNT_MERGE_CODE_URL`: `POST /v1/account/merge/code`
 - `TPX_PLATFORM_ACCOUNT_MERGE_REDEEM_URL`: `POST /v1/account/merge/redeem`
 - `TPX_PLATFORM_MAGIC_LINK_START_URL`: `POST /v1/account/magic-link/start`

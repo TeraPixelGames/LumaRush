@@ -1482,12 +1482,23 @@ function asArray(value) {
 }
 
 function assertIapConfigured(actionLabel) {
-  if (
-    !MODULE_CONFIG.identityNakamaAuthUrl ||
-    !MODULE_CONFIG.iapVerifyUrl ||
-    !MODULE_CONFIG.iapEntitlementsUrl
-  ) {
-    throw new Error("IAP is not configured for " + actionLabel + ".");
+  var missing = [];
+  if (!MODULE_CONFIG.identityNakamaAuthUrl) {
+    missing.push("TPX_PLATFORM_IDENTITY_NAKAMA_AUTH_URL");
+  }
+  if (!MODULE_CONFIG.iapVerifyUrl) {
+    missing.push("TPX_PLATFORM_IAP_VERIFY_URL");
+  }
+  if (!MODULE_CONFIG.iapEntitlementsUrl) {
+    missing.push("TPX_PLATFORM_IAP_ENTITLEMENTS_URL");
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      "IAP is not configured for " +
+        actionLabel +
+        ". Missing env vars: " +
+        missing.join(", ")
+    );
   }
 }
 
