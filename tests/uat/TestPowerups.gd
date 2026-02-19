@@ -20,7 +20,7 @@ func test_remove_color_and_undo_restore_board() -> void:
 	board_view.board.grid = custom_grid
 	board_view._refresh_tiles()
 	var before: Array = board_view.capture_snapshot()
-	var prism_badge: Label = game.get_node("UI/Powerups/RemoveColor/Badge") as Label
+	var prism_badge: Label = game.get_node("UI/Powerups/RemoveColor/Badge/Value") as Label
 	game._on_remove_color_pressed()
 	assert_that(prism_badge.text).is_equal("Tap Color")
 	await game._on_prism_color_selected(0)
@@ -38,8 +38,8 @@ func test_remove_color_and_undo_restore_board() -> void:
 func test_hint_consumes_charge() -> void:
 	var game: Control = await _spawn_game()
 	await game._on_hint_pressed()
-	var hint_badge: Label = game.get_node("UI/Powerups/Hint/Badge") as Label
-	assert_that(hint_badge.text).contains("Watch Ad")
+	var hint_badge: Label = game.get_node("UI/Powerups/Hint/Badge/Value") as Label
+	assert_that(hint_badge.visible).is_false()
 	game.queue_free()
 	await get_tree().process_frame
 
@@ -48,13 +48,14 @@ func test_depleted_button_reward_grants_that_powerup() -> void:
 	ProjectSettings.set_setting("lumarush/powerup_remove_color_charges", 0)
 	ProjectSettings.set_setting("lumarush/powerup_hint_charges", 0)
 	var game: Control = await _spawn_game()
-	var undo_badge: Label = game.get_node("UI/Powerups/Undo/Badge") as Label
-	assert_that(undo_badge.text).contains("Watch Ad")
+	var undo_badge: Label = game.get_node("UI/Powerups/Undo/Badge/Value") as Label
+	assert_that(undo_badge.visible).is_false()
 	await game._on_undo_pressed()
 	for _i in range(120):
 		await get_tree().process_frame
-		if undo_badge.text.contains("x1"):
+		if undo_badge.visible and undo_badge.text.contains("x1"):
 			break
+	assert_that(undo_badge.visible).is_true()
 	assert_that(undo_badge.text).contains("x1")
 	game.queue_free()
 	await get_tree().process_frame

@@ -55,7 +55,7 @@ func _ready() -> void:
 	_check_no_moves_and_emit()
 
 func set_tile_size(new_size: float) -> void:
-	var target: float = max(72.0, new_size)
+	var target: float = max(36.0, new_size)
 	if absf(target - tile_size) < 0.1:
 		return
 	tile_size = target
@@ -84,7 +84,7 @@ func set_theme_palette(theme_palette: Array) -> void:
 		_refresh_tiles()
 
 func _gap_for_tile_size(size: float) -> float:
-	return clamp(size * 0.08, 7.0, 11.0)
+	return clamp(size * 0.08, 4.0, 11.0)
 
 func _create_tiles() -> void:
 	tiles.clear()

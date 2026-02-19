@@ -1,15 +1,24 @@
 extends Control
 
 @onready var board: BoardView = $BoardView
+@onready var top_bar_bg: Control = $UI/TopBarBg
 @onready var top_bar: Control = $UI/TopBar
+@onready var top_right_bar: Control = $UI/TopRightBar
 @onready var powerups_row: Control = $UI/Powerups
+@onready var score_box: VBoxContainer = $UI/TopBar/ScoreBox
+@onready var score_caption_label: Label = $UI/TopBar/ScoreBox/ScoreCaption
+@onready var audio_button: Button = $UI/TopRightBar/Audio
 @onready var score_value_label: Label = $UI/TopBar/ScoreBox/ScoreValue
+@onready var pause_button: Button = $UI/TopBar/Pause
 @onready var undo_button: Button = $UI/Powerups/Undo
 @onready var remove_color_button: Button = $UI/Powerups/RemoveColor
 @onready var hint_button: Button = $UI/Powerups/Hint
-@onready var undo_badge: Label = $UI/Powerups/Undo/Badge
-@onready var prism_badge: Label = $UI/Powerups/RemoveColor/Badge
-@onready var hint_badge: Label = $UI/Powerups/Hint/Badge
+@onready var undo_badge_panel: PanelContainer = $UI/Powerups/Undo/Badge
+@onready var prism_badge_panel: PanelContainer = $UI/Powerups/RemoveColor/Badge
+@onready var hint_badge_panel: PanelContainer = $UI/Powerups/Hint/Badge
+@onready var undo_badge: Label = $UI/Powerups/Undo/Badge/Value
+@onready var prism_badge: Label = $UI/Powerups/RemoveColor/Badge/Value
+@onready var hint_badge: Label = $UI/Powerups/Hint/Badge/Value
 @onready var board_frame: ColorRect = $UI/BoardFrame
 @onready var board_glow: ColorRect = $UI/BoardGlow
 @onready var powerup_flash: ColorRect = $UI/PowerupFlash
@@ -30,13 +39,22 @@ var _powerup_usage := {"undo": 0, "prism": 0, "hint": 0}
 var _run_powerups_used_total: int = 0
 var _run_coins_spent: int = 0
 var _open_tip_shown_this_run: bool = false
+var _pause_overlap_factor: float = 0.5
+var _audio_overlay
 
 const ICON_UNDO: Texture2D = preload("res://assets/ui/icons/atlas/powerup_undo.tres")
 const ICON_PRISM: Texture2D = preload("res://assets/ui/icons/atlas/powerup_prism.tres")
 const ICON_HINT: Texture2D = preload("res://assets/ui/icons/atlas/powerup_hint.tres")
 const ICON_CANCEL: Texture2D = preload("res://assets/ui/icons/atlas/powerup_cancel.tres")
 const ICON_LOADING: Texture2D = preload("res://assets/ui/icons/atlas/powerup_loading.tres")
+const AUDIO_TRACK_OVERLAY_SCENE := preload("res://src/scenes/AudioTrackOverlay.tscn")
+const ICON_MUSIC_ON: Texture2D = preload("res://assets/ui/icons/atlas/music_on.tres")
+const ICON_MUSIC_OFF: Texture2D = preload("res://assets/ui/icons/atlas/music_off.tres")
 const TUTORIAL_TIP_SCENE := preload("res://addons/arcade_core/ui/TutorialTipModal.tscn")
+const HUD_MAX_WIDTH: float = 760.0
+const POWERUPS_MAX_WIDTH: float = 700.0
+const BADGE_BG_COLOR: Color = Color(0.96, 0.22, 0.24, 1.0)
+const BADGE_BORDER_COLOR: Color = Color(1.0, 0.9, 0.92, 0.96)
 
 func _ready() -> void:
 	var stale_overlay: Node = get_node_or_null("RunEndOverlay")
@@ -78,24 +96,32 @@ func _ready() -> void:
 		board_glow.visible = false
 	for badge in [undo_badge, prism_badge, hint_badge]:
 		badge.add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1.0))
-		badge.add_theme_color_override("font_outline_color", Color(0.1, 0.18, 0.36, 0.95))
+		badge.add_theme_color_override("font_outline_color", Color(0.3, 0.0, 0.05, 0.95))
 		badge.add_theme_constant_override("outline_size", 3)
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	for badge_panel in [undo_badge_panel, prism_badge_panel, hint_badge_panel]:
+		_style_badge_panel(badge_panel)
 	undo_button.tooltip_text = "Undo"
 	remove_color_button.tooltip_text = "Prism"
 	hint_button.tooltip_text = "Hint"
 	for button in [undo_button, remove_color_button, hint_button]:
 		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		button.expand_icon = true
+		button.clip_contents = false
+	_refresh_audio_icon()
 	powerup_flash.visible = false
 	_update_score()
 	_update_powerup_buttons()
 	_center_board()
+	call_deferred("_refresh_button_pivots")
 	_play_enter_transition()
 
 func _notification(what: int) -> void:
 	if what == Control.NOTIFICATION_RESIZED:
 		Typography.style_game(self)
 		_center_board()
+		call_deferred("_refresh_button_pivots")
 
 func _on_match_made(group: Array) -> void:
 	combo += 1
@@ -116,6 +142,7 @@ func _update_score() -> void:
 	score_value_label.text = "%d" % score
 
 func _on_pause_pressed() -> void:
+	_close_audio_overlay()
 	_set_prism_selection(false)
 	_update_powerup_buttons()
 	var pause := preload("res://src/scenes/PauseOverlay.tscn").instantiate()
@@ -129,6 +156,7 @@ func _on_resume() -> void:
 	get_tree().paused = false
 
 func _on_quit() -> void:
+	_close_audio_overlay()
 	get_tree().paused = false
 	_finish_run(false)
 
@@ -231,10 +259,10 @@ func _update_powerup_buttons() -> void:
 	remove_color_button.icon = _powerup_button_icon(ICON_PRISM, "prism")
 	hint_button.icon = _powerup_button_icon(ICON_HINT, "hint")
 	remove_color_button.tooltip_text = "Tap a tile color to clear it" if _prism_selecting else "Prism"
-	_update_badge(undo_badge, _undo_charges, _pending_powerup_refill_type == "undo")
+	_update_badge(undo_badge_panel, undo_badge, _undo_charges, _pending_powerup_refill_type == "undo")
 	var prism_hint: String = "Tap Color" if _prism_selecting else ""
-	_update_badge(prism_badge, _remove_color_charges, _pending_powerup_refill_type == "prism", prism_hint)
-	_update_badge(hint_badge, _hint_charges, _pending_powerup_refill_type == "hint")
+	_update_badge(prism_badge_panel, prism_badge, _remove_color_charges, _pending_powerup_refill_type == "prism", prism_hint)
+	_update_badge(hint_badge_panel, hint_badge, _hint_charges, _pending_powerup_refill_type == "hint")
 	undo_button.disabled = (_undo_charges > 0 and _undo_stack.is_empty()) or _is_other_refill_pending("undo") or _prism_selecting
 	remove_color_button.disabled = _is_other_refill_pending("prism")
 	hint_button.disabled = _is_other_refill_pending("hint") or _prism_selecting
@@ -349,8 +377,8 @@ func _maybe_show_open_mode_tip() -> void:
 	var modal := TUTORIAL_TIP_SCENE.instantiate()
 	if modal.has_method("configure"):
 		modal.configure({
-			"title": "Open Leaderboard Run",
-			"message": "Power-up used. This run will post to the Open leaderboard with other powered-up runs.",
+			"title": "Leaderboard Mode Update",
+			"message": "Using power-ups moves this run to the Open leaderboard. Only games without power-up usage are posted to the Pure leaderboard.",
 			"confirm_text": "Got it",
 			"checkbox_text": "Don't show this again",
 			"show_checkbox": true,
@@ -363,6 +391,83 @@ func _on_open_mode_tip_dismissed(do_not_show_again: bool) -> void:
 	if do_not_show_again:
 		SaveStore.set_tip_dismissed(SaveStore.TIP_OPEN_LEADERBOARD_FIRST_POWERUP, true)
 
+func _on_audio_pressed() -> void:
+	if is_instance_valid(_audio_overlay):
+		_close_audio_overlay()
+		return
+	var tracks: Array[Dictionary] = _music_tracks()
+	if tracks.is_empty():
+		return
+	var overlay := AUDIO_TRACK_OVERLAY_SCENE.instantiate()
+	if overlay == null:
+		return
+	add_child(overlay)
+	_audio_overlay = overlay
+	overlay.setup(_track_names_from_tracks(tracks), _selected_track_index_for_current(tracks))
+	overlay.track_selected.connect(_on_audio_overlay_track_selected)
+	overlay.closed.connect(_on_audio_overlay_closed)
+
+func _on_audio_overlay_track_selected(_track_name: String, index: int) -> void:
+	_apply_audio_track_index(index)
+
+func _on_audio_overlay_closed() -> void:
+	_audio_overlay = null
+
+func _close_audio_overlay() -> void:
+	if not is_instance_valid(_audio_overlay):
+		_audio_overlay = null
+		return
+	_audio_overlay.queue_free()
+	_audio_overlay = null
+
+func _music_tracks() -> Array[Dictionary]:
+	return MusicManager.get_available_tracks()
+
+func _track_names_from_tracks(tracks: Array[Dictionary]) -> Array[String]:
+	var names: Array[String] = []
+	for track in tracks:
+		names.append(str(track.get("name", "Track")))
+	return names
+
+func _selected_track_index_for_current(tracks: Array[Dictionary]) -> int:
+	if tracks.is_empty():
+		return 0
+	var current_id: String = str(MusicManager.get_current_track_id())
+	for i in range(tracks.size()):
+		if str(tracks[i].get("id", "")) == current_id:
+			return i
+	return 0
+
+func _apply_audio_track_index(index: int) -> void:
+	var tracks: Array[Dictionary] = _music_tracks()
+	if tracks.is_empty():
+		return
+	var selected: int = clampi(index, 0, tracks.size() - 1)
+	var track_id: String = str(tracks[selected].get("id", ""))
+	if track_id.is_empty():
+		return
+	MusicManager.set_track(track_id, true)
+	_sync_audio_overlay_selection()
+	_refresh_audio_icon()
+
+func _sync_audio_overlay_selection() -> void:
+	if not is_instance_valid(_audio_overlay):
+		return
+	var tracks: Array[Dictionary] = _music_tracks()
+	_audio_overlay.set_selected_index(_selected_track_index_for_current(tracks))
+
+static func is_muted_track(track_id: String) -> bool:
+	return track_id.strip_edges().to_lower() == "off"
+
+func _refresh_audio_icon() -> void:
+	if audio_button == null:
+		return
+	var muted: bool = is_muted_track(str(MusicManager.get_current_track_id()))
+	audio_button.set("icon_texture", ICON_MUSIC_OFF if muted else ICON_MUSIC_ON)
+	var label: String = "Audio Off" if muted else "Audio"
+	audio_button.set("tooltip_text_override", label)
+	audio_button.set("accessibility_name_override", label)
+
 func _powerup_button_icon(base_icon: Texture2D, powerup_type: String) -> Texture2D:
 	if _prism_selecting and powerup_type == "prism":
 		return ICON_CANCEL
@@ -370,46 +475,99 @@ func _powerup_button_icon(base_icon: Texture2D, powerup_type: String) -> Texture
 		return ICON_LOADING
 	return base_icon
 
-func _update_badge(label: Label, charges: int, is_loading: bool, custom_text: String = "") -> void:
-	if label == null:
+func _update_badge(panel: PanelContainer, label: Label, charges: int, is_loading: bool, custom_text: String = "") -> void:
+	if panel == null or label == null:
 		return
+	_style_badge_panel(panel)
 	label.visible = true
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.clip_text = true
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	if not custom_text.is_empty():
 		label.text = custom_text
 		label.modulate = Color(0.98, 0.99, 1.0, 0.98)
-		_set_badge_centered(label)
+		_set_badge_centered(panel, label)
 	elif is_loading:
-		label.text = "Loading..."
+		label.text = "..."
 		label.modulate = Color(0.78, 0.86, 1.0, 0.94)
-		_set_badge_centered(label)
+		_set_badge_centered(panel, label)
 	elif charges > 0:
 		label.text = "x%d" % charges
 		label.modulate = Color(0.98, 0.99, 1.0, 0.98)
-		_set_badge_top_center(label)
+		_set_badge_top_right(panel)
+		_fit_badge_font_size(label)
 	else:
-		label.text = "Watch Ad"
-		label.modulate = Color(0.78, 0.9, 1.0, 0.98)
-		_set_badge_top_center(label)
+		panel.visible = false
+		label.visible = false
+		label.text = ""
 
-func _set_badge_top_center(label: Label) -> void:
-	label.anchor_left = 0.0
-	label.anchor_top = 0.0
-	label.anchor_right = 1.0
-	label.anchor_bottom = 0.0
-	label.offset_left = 8.0
-	label.offset_top = 8.0
-	label.offset_right = -8.0
-	label.offset_bottom = 40.0
+func _set_badge_top_right(panel: PanelContainer) -> void:
+	if panel == null:
+		return
+	var row_height: float = 110.0
+	if powerups_row and powerups_row.size.y > 0.0:
+		row_height = powerups_row.size.y
+	var radius: float = clamp(row_height * 0.17, 15.0, 22.0)
+	panel.visible = true
+	panel.anchor_left = 1.0
+	panel.anchor_top = 0.0
+	panel.anchor_right = 1.0
+	panel.anchor_bottom = 0.0
+	panel.offset_left = -radius
+	panel.offset_top = -radius
+	panel.offset_right = radius
+	panel.offset_bottom = radius
+	panel.z_index = 10
+	panel.size_flags_horizontal = Control.SIZE_SHRINK_END
 
-func _set_badge_centered(label: Label) -> void:
-	label.anchor_left = 0.0
-	label.anchor_top = 0.0
-	label.anchor_right = 1.0
-	label.anchor_bottom = 1.0
-	label.offset_left = 8.0
-	label.offset_top = 0.0
-	label.offset_right = -8.0
-	label.offset_bottom = 0.0
+func _set_badge_centered(panel: PanelContainer, label: Label) -> void:
+	if panel == null or label == null:
+		return
+	panel.visible = true
+	panel.anchor_left = 0.0
+	panel.anchor_top = 0.0
+	panel.anchor_right = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left = 8.0
+	panel.offset_top = 6.0
+	panel.offset_right = -8.0
+	panel.offset_bottom = -6.0
+	label.add_theme_font_size_override("font_size", int(round(clamp(panel.size.y * 0.28, 14.0, 22.0))))
+
+func _fit_badge_font_size(label: Label) -> void:
+	var font: Font = label.get_theme_font("font")
+	if font == null:
+		return
+	if label.size.x <= 0.0:
+		return
+	var max_width: float = max(24.0, label.size.x - 10.0)
+	var font_size_candidate: int = max(12, label.get_theme_font_size("font_size"))
+	while font_size_candidate > 12:
+		var measured_width: float = font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size_candidate).x
+		if measured_width <= max_width:
+			break
+		font_size_candidate -= 1
+	label.add_theme_font_size_override("font_size", font_size_candidate)
+
+func _style_badge_panel(panel: PanelContainer) -> void:
+	if panel == null:
+		return
+	var style := StyleBoxFlat.new()
+	style.bg_color = BADGE_BG_COLOR
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.border_color = BADGE_BORDER_COLOR
+	style.corner_radius_top_left = 128
+	style.corner_radius_top_right = 128
+	style.corner_radius_bottom_left = 128
+	style.corner_radius_bottom_right = 128
+	style.anti_aliasing = true
+	style.anti_aliasing_size = 1.2
+	panel.add_theme_stylebox_override("panel", style)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _is_other_refill_pending(powerup_type: String) -> bool:
 	return not _pending_powerup_refill_type.is_empty() and _pending_powerup_refill_type != powerup_type
@@ -427,6 +585,7 @@ func _finish_run(completed_by_gameplay: bool) -> void:
 		return
 	if _ending_transition_started:
 		return
+	_close_audio_overlay()
 	get_tree().paused = false
 	_ending_transition_started = true
 	_set_prism_selection(false)
@@ -480,21 +639,156 @@ func _center_board() -> void:
 	if board == null:
 		return
 	var view_size: Vector2 = get_viewport_rect().size
-	var horizontal_padding: float = max(28.0, view_size.x * 0.06)
+	if view_size.x <= 0.0 or view_size.y <= 0.0:
+		return
+
+	var outer_margin: float = clamp(view_size.x * 0.04, 14.0, 44.0)
+	var max_column_width: float = max(260.0, min(HUD_MAX_WIDTH, view_size.x - 8.0))
+	var min_column_width: float = min(340.0, max_column_width)
+	var content_width: float = clamp(view_size.x - (outer_margin * 2.0), min_column_width, max_column_width)
+	var content_left: float = (view_size.x - content_width) * 0.5
+
+	_layout_top_bar(view_size, content_left, content_width)
+	_layout_top_right(view_size)
+
+	var powerup_row_height: float = clamp(view_size.y * 0.16, 96.0, 122.0)
+	var max_row_width: float = max(280.0, min(POWERUPS_MAX_WIDTH, content_width))
+	var min_row_width: float = min(320.0, max_row_width)
+	var powerup_row_width: float = clamp(content_width, min_row_width, max_row_width)
+	_layout_powerups(view_size, powerup_row_width, powerup_row_height)
+	_apply_responsive_hud_typography(content_width, top_bar_bg.size.y, powerup_row_height)
+
+	var vertical_gap: float = clamp(view_size.y * 0.022, 14.0, 26.0)
 	var top_limit: float = view_size.y * 0.14
-	if top_bar and top_bar.size.y > 0.0:
-		top_limit = top_bar.position.y + top_bar.size.y + 30.0
+	if top_bar_bg and top_bar_bg.size.y > 0.0:
+		top_limit = top_bar_bg.position.y + top_bar_bg.size.y + vertical_gap
 	var bottom_limit: float = view_size.y * 0.81
 	if powerups_row and powerups_row.size.y > 0.0:
-		bottom_limit = powerups_row.position.y - 30.0
-	var available_width: float = max(320.0, view_size.x - (horizontal_padding * 2.0))
-	var available_height: float = max(420.0, bottom_limit - top_limit)
+		bottom_limit = powerups_row.position.y - vertical_gap
+	var available_width: float = max(120.0, content_width)
+	var available_height: float = max(120.0, bottom_limit - top_limit)
 	var fit_w: float = floor(available_width / float(board.width))
 	var fit_h: float = floor(available_height / float(board.height))
-	var target_tile_size: float = clamp(min(fit_w, fit_h), 100.0, 116.0)
+	var target_tile_size: float = clamp(min(fit_w, fit_h), 36.0, 188.0)
 	board.set_tile_size(target_tile_size)
 	var board_size: Vector2 = Vector2(board.width * board.tile_size, board.height * board.tile_size)
 	board.position = Vector2(
 		(view_size.x - board_size.x) * 0.5,
 		top_limit + ((available_height - board_size.y) * 0.5)
 	)
+
+	powerup_row_width = clamp(board_size.x + max(84.0, board.tile_size * 0.8), min_row_width, max_row_width)
+	_layout_powerups(view_size, powerup_row_width, powerup_row_height)
+	_apply_responsive_hud_typography(content_width, top_bar_bg.size.y, powerup_row_height)
+	_refresh_button_pivots()
+
+	if board_frame:
+		var frame_padding: float = clamp(board.tile_size * 0.18, 12.0, 24.0)
+		board_frame.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		board_frame.position = board.position - Vector2(frame_padding, frame_padding)
+		board_frame.size = board_size + Vector2(frame_padding * 2.0, frame_padding * 2.0)
+	if board_glow:
+		var glow_padding: float = clamp(board.tile_size * 0.28, 18.0, 36.0)
+		board_glow.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		board_glow.position = board.position - Vector2(glow_padding, glow_padding)
+		board_glow.size = board_size + Vector2(glow_padding * 2.0, glow_padding * 2.0)
+
+func _layout_top_bar(view_size: Vector2, content_left: float, content_width: float) -> void:
+	if top_bar_bg == null or top_bar == null:
+		return
+	var top_margin: float = clamp(view_size.y * 0.03, 14.0, 30.0)
+	var bar_height: float = clamp(view_size.y * 0.16, 92.0, 132.0)
+	top_bar_bg.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	top_bar_bg.position = Vector2(content_left, top_margin)
+	top_bar_bg.size = Vector2(content_width, bar_height)
+
+	var content_inset_x: float = clamp(content_width * 0.055, 14.0, 34.0)
+	var content_inset_y: float = clamp(bar_height * 0.09, 8.0, 14.0)
+	var right_reserve: float = clamp(content_width * 0.03, 12.0, 28.0)
+	var vertical_lift: float = clamp(bar_height * 0.06, 4.0, 8.0)
+	top_bar.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	top_bar.position = Vector2(content_left + content_inset_x, top_margin + content_inset_y - vertical_lift)
+	top_bar.size = Vector2(
+		max(220.0, content_width - (content_inset_x * 2.0) - right_reserve),
+		max(56.0, bar_height - (content_inset_y * 2.0))
+	)
+	top_bar.add_theme_constant_override("separation", int(round(clamp(content_width * 0.016, 10.0, 20.0))))
+	if score_box:
+		score_box.add_theme_constant_override("separation", int(round(clamp(bar_height * 0.035, 4.0, 8.0))))
+	if pause_button:
+		var pause_size: float = clamp(top_bar.size.y * 0.74, 52.0, 82.0)
+		pause_button.custom_minimum_size = Vector2(pause_size, pause_size)
+		pause_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pause_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+		_pause_overlap_factor = _pause_overlap_factor_for_viewport(view_size)
+		_queue_pause_button_overlap_position()
+
+func _layout_top_right(view_size: Vector2) -> void:
+	if top_right_bar == null or audio_button == null:
+		return
+	var margin: float = clamp(min(view_size.x, view_size.y) * 0.045, 12.0, 32.0)
+	var icon_size: float = clamp(min(view_size.x, view_size.y) * 0.12, 68.0, 92.0)
+	top_right_bar.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	top_right_bar.position = Vector2(view_size.x - margin - icon_size, margin)
+	top_right_bar.size = Vector2(icon_size, icon_size)
+	audio_button.custom_minimum_size = Vector2(icon_size, icon_size)
+
+func _apply_responsive_hud_typography(content_width: float, bar_height: float, powerup_row_height: float) -> void:
+	var caption_size: int = int(round(clamp(bar_height * 0.25, 14.0, 30.0)))
+	var value_size: int = int(round(clamp(bar_height * 0.54, 26.0, 68.0)))
+	if content_width < 520.0:
+		caption_size = min(caption_size, 22)
+		value_size = min(value_size, 48)
+	if score_caption_label:
+		score_caption_label.add_theme_font_size_override("font_size", caption_size)
+	if score_value_label:
+		score_value_label.add_theme_font_size_override("font_size", value_size)
+		score_value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		score_value_label.custom_minimum_size.y = clamp(bar_height * 0.5, 40.0, 72.0)
+
+	var badge_font_size: int = int(round(clamp(powerup_row_height * 0.27, 15.0, 28.0)))
+	for badge in [undo_badge, prism_badge, hint_badge]:
+		if badge:
+			badge.add_theme_font_size_override("font_size", badge_font_size)
+			_fit_badge_font_size(badge)
+
+func _layout_powerups(view_size: Vector2, row_width: float, row_height: float) -> void:
+	if powerups_row == null:
+		return
+	var bottom_margin: float = clamp(view_size.y * 0.035, 14.0, 28.0)
+	powerups_row.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	powerups_row.position = Vector2((view_size.x - row_width) * 0.5, view_size.y - bottom_margin - row_height)
+	powerups_row.size = Vector2(row_width, row_height)
+	powerups_row.add_theme_constant_override("separation", int(round(clamp(row_width * 0.03, 12.0, 22.0))))
+	for button in [undo_button, remove_color_button, hint_button]:
+		if button:
+			button.custom_minimum_size = Vector2(0.0, row_height)
+
+func _refresh_button_pivots() -> void:
+	for button_variant in [pause_button, audio_button, undo_button, remove_color_button, hint_button]:
+		var button: Control = button_variant as Control
+		if button == null:
+			continue
+		if button.size.x <= 0.0 or button.size.y <= 0.0:
+			continue
+		button.pivot_offset = button.size * 0.5
+
+func _position_pause_button_overlap() -> void:
+	if pause_button == null or top_bar == null:
+		return
+	if pause_button.size.y <= 0.0:
+		return
+	var centered_y: float = floor((top_bar.size.y - pause_button.size.y) * 0.5)
+	pause_button.position.y = centered_y - (pause_button.size.y * _pause_overlap_factor)
+
+func _pause_overlap_factor_for_viewport(view_size: Vector2) -> float:
+	if view_size.y <= 0.0:
+		return 0.5
+	var aspect: float = view_size.x / view_size.y
+	return 0.42 if aspect < 0.9 else 0.5
+
+func _queue_pause_button_overlap_position() -> void:
+	call_deferred("_queue_pause_button_overlap_position_deferred")
+
+func _queue_pause_button_overlap_position_deferred() -> void:
+	call_deferred("_position_pause_button_overlap")

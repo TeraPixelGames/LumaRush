@@ -13,6 +13,8 @@ const DEFAULT_BASE_URL := "http://127.0.0.1:7350"
 const DEFAULT_SERVER_KEY := "lumarush-dev-key"
 const DEFAULT_LEADERBOARD_LIMIT := 10
 const DEFAULT_EXPORT_TARGET := "web"
+const EMAIL_MAX_LENGTH := 320
+const MERGE_CODE_MAX_LENGTH := 64
 var PROVIDERS_BY_EXPORT_TARGET := {
 	"ios": ["apple"],
 	"android": ["google"],
@@ -110,10 +112,10 @@ func is_linked_account() -> bool:
 	return not SaveStore.get_terapixel_user_id().is_empty()
 
 func get_linked_email() -> String:
-	return SaveStore.get_terapixel_email().strip_edges().to_lower()
+	return _sanitize_email_input(SaveStore.get_terapixel_email())
 
 func set_linked_email(email: String) -> void:
-	var normalized := email.strip_edges().to_lower()
+	var normalized := _sanitize_email_input(email)
 	if normalized.is_empty():
 		return
 	SaveStore.set_terapixel_email(normalized)
@@ -526,7 +528,10 @@ func consume_powerup(powerup_type: String, quantity: int = 1) -> Dictionary:
 func start_magic_link(email: String) -> Dictionary:
 	if not await ensure_authenticated():
 		return {"ok": false, "error": "auth failed"}
-	var payload := {"email": email.strip_edges().to_lower()}
+	var sanitized_email := _sanitize_email_input(email)
+	if sanitized_email.is_empty():
+		return {"ok": false, "error": "invalid email"}
+	var payload := {"email": sanitized_email}
 	return await _rpc_call("tpx_account_magic_link_start", payload, true, true)
 
 func complete_magic_link(ml_token: String) -> Dictionary:
@@ -562,7 +567,10 @@ func create_account_merge_code() -> Dictionary:
 func redeem_account_merge_code(merge_code: String) -> Dictionary:
 	if not await ensure_authenticated():
 		return {"ok": false, "error": "auth failed"}
-	return await _rpc_call("tpx_account_merge_redeem", {"merge_code": merge_code.strip_edges()}, true, true)
+	var sanitized_merge_code := _sanitize_merge_code_input(merge_code)
+	if sanitized_merge_code.is_empty():
+		return {"ok": false, "error": "invalid merge_code"}
+	return await _rpc_call("tpx_account_merge_redeem", {"merge_code": sanitized_merge_code}, true, true)
 
 func get_username_status() -> Dictionary:
 	if not await ensure_authenticated():
@@ -572,7 +580,10 @@ func get_username_status() -> Dictionary:
 func update_username(new_username: String) -> Dictionary:
 	if not await ensure_authenticated():
 		return {"ok": false, "error": "auth failed"}
-	var payload := {"username": new_username.strip_edges().to_lower()}
+	var sanitized_username := _sanitize_requested_username(new_username)
+	if sanitized_username.is_empty():
+		return {"ok": false, "error": "invalid username"}
+	var payload := {"username": sanitized_username}
 	var rpc: Dictionary = await _rpc_call("tpx_account_update_username", payload, true, true)
 	if not rpc.get("ok", false):
 		return rpc
@@ -668,7 +679,7 @@ func _hydrate_auth_session(auth_response: Dictionary) -> Dictionary:
 func _handle_magic_link_completion(data: Dictionary) -> void:
 	var status := str(data.get("status", data.get("link_status", "ok")))
 	var linked_profile_id := _extract_magic_link_profile_id(data)
-	var linked_email := str(data.get("email", "")).strip_edges().to_lower()
+	var linked_email := _sanitize_email_input(str(data.get("email", "")))
 	if not linked_email.is_empty():
 		SaveStore.set_terapixel_email(linked_email)
 	if not linked_profile_id.is_empty():
@@ -845,6 +856,94 @@ func _sanitize_username(value: String) -> String:
 	if out.length() > 20:
 		out = out.substr(0, 20)
 	return out
+
+func _sanitize_requested_username(value: String) -> String:
+	var raw := value.strip_edges().to_lower()
+	if raw.is_empty():
+		return ""
+	var out := ""
+	for i in range(raw.length()):
+		var c := raw[i]
+		var is_letter := c >= "a" and c <= "z"
+		var is_digit := c >= "0" and c <= "9"
+		if is_letter or is_digit or c == "_" or c == "-":
+			out += c
+		else:
+			return ""
+	if out.length() < 3 or out.length() > 20:
+		return ""
+	if out.begins_with("_") or out.begins_with("-") or out.ends_with("_") or out.ends_with("-"):
+		return ""
+	return out
+
+func _sanitize_merge_code_input(value: String) -> String:
+	var cleaned := value.strip_edges().to_upper()
+	if cleaned.is_empty() or cleaned.length() > MERGE_CODE_MAX_LENGTH:
+		return ""
+	var out := ""
+	for i in range(cleaned.length()):
+		var c := cleaned[i]
+		var is_letter := c >= "A" and c <= "Z"
+		var is_digit := c >= "0" and c <= "9"
+		if is_letter or is_digit or c == "-":
+			out += c
+	if out.is_empty():
+		return ""
+	return out
+
+func _sanitize_email_input(value: String) -> String:
+	var cleaned := str(value).strip_edges().to_lower()
+	if cleaned.is_empty() or cleaned.length() > EMAIL_MAX_LENGTH:
+		return ""
+	if cleaned.find(" ") != -1 or cleaned.find("\t") != -1 or cleaned.find("\n") != -1 or cleaned.find("\r") != -1:
+		return ""
+	var at_idx := cleaned.find("@")
+	if at_idx <= 0 or at_idx >= cleaned.length() - 1 or at_idx != cleaned.rfind("@"):
+		return ""
+	var local := cleaned.substr(0, at_idx)
+	var domain := cleaned.substr(at_idx + 1)
+	if local.length() > 64:
+		return ""
+	if not _is_valid_email_local(local):
+		return ""
+	if not _is_valid_email_domain(domain):
+		return ""
+	return cleaned
+
+func _is_valid_email_local(local: String) -> bool:
+	if local.is_empty() or local.begins_with(".") or local.ends_with(".") or local.find("..") != -1:
+		return false
+	var allowed_specials := "!#$%&'*+/=?^_`{|}~.-"
+	for i in range(local.length()):
+		var c := local[i]
+		var is_letter := c >= "a" and c <= "z"
+		var is_digit := c >= "0" and c <= "9"
+		if is_letter or is_digit:
+			continue
+		if allowed_specials.find(c) != -1:
+			continue
+		return false
+	return true
+
+func _is_valid_email_domain(domain: String) -> bool:
+	if domain.is_empty() or domain.length() > 255 or domain.begins_with(".") or domain.ends_with("."):
+		return false
+	var labels := domain.split(".", false)
+	if labels.size() < 2:
+		return false
+	for label in labels:
+		if label.is_empty() or label.length() > 63:
+			return false
+		if label.begins_with("-") or label.ends_with("-"):
+			return false
+		for i in range(label.length()):
+			var c := label[i]
+			var is_letter := c >= "a" and c <= "z"
+			var is_digit := c >= "0" and c <= "9"
+			if is_letter or is_digit or c == "-":
+				continue
+			return false
+	return true
 
 func _augment_metadata(metadata: Dictionary) -> Dictionary:
 	var out := metadata.duplicate(true)

@@ -37,13 +37,10 @@ window/handheld/orientation="portrait"
 
 [display]
 
-window/size/viewport_width=1170
-window/size/viewport_height=2532
-window/size/mode=4
 window/size/resizable=false
 window/size/borderless=true
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep_width"
+window/stretch/aspect="expand"
 window/handheld/orientation=1
 
 [editor_plugins]

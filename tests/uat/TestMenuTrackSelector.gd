@@ -17,7 +17,7 @@ func test_main_menu_track_selection_updates_state_and_manager() -> void:
 			break
 	var next_index: int = posmod(current_index + 1, tracks.size())
 	var expected_next_id: String = str(tracks[next_index].get("id", ""))
-	menu._on_track_next_pressed()
+	menu._cycle_track(1)
 
 	assert_that(str(SaveStore.data["selected_track_id"])).is_equal(expected_next_id)
 	assert_that(MusicManager.get_current_track_id()).is_equal(expected_next_id)

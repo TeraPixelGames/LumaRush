@@ -23,7 +23,7 @@ func _exit_tree() -> void:
 	_rewarded_preload_loop_active = false
 
 func _initialize_provider_async() -> void:
-	if provider != null:
+	if _has_provider():
 		return
 	var forced_mock: bool = bool(ProjectSettings.get_setting("lumarush/use_mock_ads", Engine.is_editor_hint()))
 	var has_admob_singleton: bool = Engine.has_singleton("AdmobPlugin")
@@ -44,7 +44,7 @@ func _initialize_provider_async() -> void:
 	_bind_provider()
 
 func _bind_provider() -> void:
-	if provider == null:
+	if not _has_provider():
 		return
 	provider.connect("interstitial_loaded", Callable(self, "_on_interstitial_loaded"))
 	provider.connect("interstitial_closed", Callable(self, "_on_interstitial_closed"))
@@ -57,7 +57,6 @@ func _bind_provider() -> void:
 
 func on_game_finished() -> void:
 	SaveStore.increment_games_played()
-	maybe_show_interstitial()
 
 func maybe_show_interstitial() -> void:
 	var games := int(SaveStore.data["games_played"])
@@ -122,7 +121,7 @@ func _on_rewarded_closed() -> void:
 	emit_signal("rewarded_closed")
 
 func _show_interstitial_now(games: int) -> bool:
-	if provider == null:
+	if not _has_provider():
 		return false
 	if provider.show_interstitial(INTERSTITIAL_ID):
 		_last_interstitial_shown_games_played = games
@@ -134,7 +133,7 @@ func _show_interstitial_now(games: int) -> bool:
 	return false
 
 func _show_rewarded_now() -> bool:
-	if provider == null:
+	if not _has_provider():
 		return false
 	var shown: bool = provider.show_rewarded(REWARDED_ID)
 	if shown:
@@ -167,7 +166,7 @@ func _start_rewarded_retry() -> bool:
 
 func _retry_interstitial_async(games: int, retries_left: int) -> void:
 	while _interstitial_retry_active and retries_left > 0 and _last_interstitial_shown_games_played != games:
-		if provider == null:
+		if not _has_provider():
 			break
 		provider.load_interstitial(INTERSTITIAL_ID)
 		await get_tree().create_timer(FeatureFlags.ad_retry_interval_seconds()).timeout
@@ -182,7 +181,7 @@ func _retry_interstitial_async(games: int, retries_left: int) -> void:
 func _retry_rewarded_async(retries_left: int) -> void:
 	var had_active_context: bool = _active_rewarded_context != ""
 	while _rewarded_retry_active and retries_left > 0:
-		if provider == null:
+		if not _has_provider():
 			break
 		provider.load_rewarded(REWARDED_ID)
 		await get_tree().create_timer(FeatureFlags.ad_retry_interval_seconds()).timeout
@@ -201,7 +200,7 @@ func _start_rewarded_preload_loop() -> void:
 	_rewarded_preload_loop()
 
 func _rewarded_preload_loop() -> void:
-	while _rewarded_preload_loop_active and is_inside_tree() and provider != null:
+	while _rewarded_preload_loop_active and is_inside_tree() and _has_provider():
 		var is_ready: bool = false
 		if provider.has_method("is_rewarded_ready"):
 			is_ready = bool(provider.call("is_rewarded_ready"))
@@ -210,7 +209,11 @@ func _rewarded_preload_loop() -> void:
 		await get_tree().create_timer(FeatureFlags.ad_preload_poll_seconds()).timeout
 
 func _ensure_provider_available() -> void:
-	if provider != null:
+	if _has_provider():
 		return
+	provider = null
 	provider = MockAdProvider.new()
 	_bind_provider()
+
+func _has_provider() -> bool:
+	return provider != null and is_instance_valid(provider)

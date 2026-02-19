@@ -1,10 +1,12 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://src/scenes/Results.gd" id=1]
 [ext_resource type="PackedScene" path="res://src/visual/BackgroundController.tscn" id=2]
 [ext_resource type="Script" path="res://src/ui/GlassPanel.gd" id=3]
 [ext_resource type="Theme" path="res://src/ui/UiTheme.tres" id=4]
 [ext_resource type="Script" path="res://src/ui/LiquidGlassButton.gd" id=5]
+[ext_resource type="PackedScene" path="res://ui/components/IconButton.tscn" id=6]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/atlas/music_on.tres" id=7]
 
 [node name="Results" type="Control"]
 anchor_right = 1.0
@@ -17,6 +19,27 @@ theme = ExtResource( 4 )
 [node name="UI" type="Control" parent="."]
 anchor_right = 1.0
 anchor_bottom = 1.0
+
+[node name="TopRightBar" type="Control" parent="UI"]
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -86.0
+offset_top = 18.0
+offset_right = -18.0
+offset_bottom = 86.0
+
+[node name="Audio" parent="UI/TopRightBar" instance=ExtResource( 6 )]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+icon_texture = ExtResource( 7 )
+tooltip_text_override = "Audio"
+accessibility_name_override = "Audio"
 
 [node name="Panel" type="ColorRect" parent="UI"]
 script = ExtResource( 3 )
@@ -35,81 +58,96 @@ strength_y = 8.0
 chromatic_strength = 0.18
 color = Color(0.12, 0.18, 0.32, 0.22)
 
-[node name="VBox" type="VBoxContainer" parent="UI"]
-anchor_left = 0.15
-anchor_top = 0.21
-anchor_right = 0.85
-anchor_bottom = 0.79
+[node name="Scroll" type="ScrollContainer" parent="UI/Panel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+horizontal_scroll_mode = 0
+
+[node name="VBox" type="VBoxContainer" parent="UI/Panel/Scroll"]
+size_flags_horizontal = 3
 alignment = 1
 theme_override_constants/separation = 24
 
-[node name="Title" type="Label" parent="UI/VBox"]
-text = "Results"
+[node name="Title" type="Label" parent="UI/Panel/Scroll/VBox"]
+text = "LumaRush"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 54
 
-[node name="Score" type="Label" parent="UI/VBox"]
+[node name="StatsSplit" type="GridContainer" parent="UI/Panel/Scroll/VBox"]
+size_flags_horizontal = 3
+columns = 2
+
+[node name="LeftColumn" type="VBoxContainer" parent="UI/Panel/Scroll/VBox/StatsSplit"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="Score" type="Label" parent="UI/Panel/Scroll/VBox/StatsSplit/LeftColumn"]
 text = "Score: 0"
-horizontal_alignment = 1
+horizontal_alignment = 0
 theme_override_font_sizes/font_size = 84
 
-[node name="ModeBadge" type="Label" parent="UI/VBox"]
+[node name="ModeBadge" type="Label" parent="UI/Panel/Scroll/VBox/StatsSplit/LeftColumn"]
 text = "Mode: Pure"
-horizontal_alignment = 1
+horizontal_alignment = 0
 theme_override_font_sizes/font_size = 20
 
-[node name="Best" type="Label" parent="UI/VBox"]
+[node name="Best" type="Label" parent="UI/Panel/Scroll/VBox/StatsSplit/LeftColumn"]
 text = "Best: 0"
-horizontal_alignment = 1
+horizontal_alignment = 0
 theme_override_font_sizes/font_size = 30
 
-[node name="Streak" type="Label" parent="UI/VBox"]
+[node name="Streak" type="Label" parent="UI/Panel/Scroll/VBox/StatsSplit/LeftColumn"]
 text = "Streak: 0"
-horizontal_alignment = 1
+horizontal_alignment = 0
 theme_override_font_sizes/font_size = 30
 
-[node name="OnlineStatus" type="Label" parent="UI/VBox"]
+[node name="RightColumn" type="VBoxContainer" parent="UI/Panel/Scroll/VBox/StatsSplit"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="OnlineStatus" type="Label" parent="UI/Panel/Scroll/VBox/StatsSplit/RightColumn"]
 text = "Online: connecting..."
-horizontal_alignment = 1
+horizontal_alignment = 0
 theme_override_font_sizes/font_size = 24
 
-[node name="Leaderboard" type="Label" parent="UI/VBox"]
+[node name="Leaderboard" type="Label" parent="UI/Panel/Scroll/VBox/StatsSplit/RightColumn"]
 text = "Leaderboard loading..."
-horizontal_alignment = 1
+horizontal_alignment = 0
 theme_override_font_sizes/font_size = 24
 autowrap_mode = 2
 
-[node name="CoinsEarned" type="Label" parent="UI/VBox"]
+[node name="CoinsEarned" type="Label" parent="UI/Panel/Scroll/VBox"]
 text = "Coins earned: 0"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 24
 
-[node name="CoinBalance" type="Label" parent="UI/VBox"]
+[node name="CoinBalance" type="Label" parent="UI/Panel/Scroll/VBox"]
 text = "Coins balance: 0"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 22
 
-[node name="DoubleReward" type="Button" parent="UI/VBox"]
+[node name="DoubleReward" type="Button" parent="UI/Panel/Scroll/VBox"]
 script = ExtResource( 5 )
 text = "Watch Ad: Double Coins"
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(0, 88)
 
-[node name="Spacer" type="Control" parent="UI/VBox"]
+[node name="Spacer" type="Control" parent="UI/Panel/Scroll/VBox"]
 size_flags_vertical = 3
 
-[node name="PlayAgain" type="Button" parent="UI/VBox"]
+[node name="PlayAgain" type="Button" parent="UI/Panel/Scroll/VBox"]
 script = ExtResource( 5 )
 text = "Play Again"
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(0, 118)
 
-[node name="Menu" type="Button" parent="UI/VBox"]
+[node name="Menu" type="Button" parent="UI/Panel/Scroll/VBox"]
 script = ExtResource( 5 )
 text = "Main Menu"
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(0, 118)
 
-[connection signal="pressed" from="UI/VBox/PlayAgain" to="." method="_on_play_again_pressed"]
-[connection signal="pressed" from="UI/VBox/Menu" to="." method="_on_menu_pressed"]
-[connection signal="pressed" from="UI/VBox/DoubleReward" to="." method="_on_double_reward_pressed"]
+[connection signal="pressed" from="UI/Panel/Scroll/VBox/PlayAgain" to="." method="_on_play_again_pressed"]
+[connection signal="pressed" from="UI/Panel/Scroll/VBox/Menu" to="." method="_on_menu_pressed"]
+[connection signal="pressed" from="UI/Panel/Scroll/VBox/DoubleReward" to="." method="_on_double_reward_pressed"]
+[connection signal="pressed" from="UI/TopRightBar/Audio" to="." method="_on_audio_pressed"]

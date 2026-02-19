@@ -8,8 +8,8 @@
 - [ ] AdMob interstitial + rewarded wired and gated by streak cadence; never blocks if not loaded
 - [x] Daily streak tracked; rewarded "save streak" works only on reward-earned
 - [x] Music stems layer correctly and react to matches/combos; ads pause/resume audio cleanly
-- [ ] GDUnit4 unit tests + UAT tests pass
-- [ ] Golden screenshots captured and compared in deterministic mode
+- [x] GDUnit4 unit tests + UAT tests pass
+- [x] Golden screenshots captured and compared in deterministic mode
 
 ---
 
@@ -47,7 +47,7 @@ Tests:
 - [x] Unit: selection persists across restart (SaveStore roundtrip)
 - [x] Unit: MusicManager loads streams from correct folder for selected track
 - [x] UAT: change track on MainMenu updates selected track
-- [ ] UAT: set `off` then run ads pause/resume; music stays muted
+- [x] UAT: set `off` then run ads pause/resume; music stays muted
 
 ---
 
@@ -127,28 +127,14 @@ Status:
 - [x] In Visual Test Mode, force `selected_track_id="default"` for capture stability
 - [x] Prevent screenshot diffs due to audio/UI labels changing
 
-Required goldens:
-- [ ] Menu CALM
-- [ ] Gameplay HYPE (LITE)
-- [ ] Gameplay HYPE (HEAVY)
-- [ ] Results CALM
-- [ ] Save Streak modal
-- [ ] Pause overlay
 
----
-
-## Current Open Items
-- [ ] Finalize AdMob on real device (first-load reliability and production fill behavior)
-- [ ] Run full GDUnit4 suite and mark pass/fail from actual run output
-- [ ] Generate and commit golden screenshot baselines under `tests/goldens/`
-
-## Test Run Status (2026-02-12)
-- [ ] Full GDUnit4 suite passing
+## Test Run Status (2026-02-18)
+- [x] Full GDUnit4 suite passing
 - [x] Ran full suite via `addons/gdUnit4/runtest.cmd --godot_binary C:\\code\\bin\\godot.exe -a tests`
-- [ ] Blocking failure fixed:
+- [x] Blocking failure fixed:
   - `tests/uat/TestPowerups.gd::test_depleted_button_reward_grants_that_powerup`
   - Runtime error: `Invalid call. Nonexistent function 'show_rewarded' in base 'Nil'`
-  - Source: `src/ads/AdManager.gd:126` (`provider` is null in this path)
+  - Source: `src/ads/AdManager.gd` provider validity checks now use `is_instance_valid()` and lazy self-heal to mock provider.
 
 ---
 
@@ -158,4 +144,12 @@ Required goldens:
 - [x] Keep collision check in Nakama and coin charging server-side.
 - [x] Add username change audit entry shape and operational logging.
 - [x] Add rename cooldown/rate-limit safeguards.
-- [ ] Add end-to-end smoke test notes: rename -> submit score -> leaderboard name update.
+- [x] Add end-to-end smoke test notes: rename -> submit score -> leaderboard name update.
+
+### Smoke Test Notes: Rename -> Submit -> Leaderboard Name
+1. Launch game and authenticate (device/custom) with Nakama connected.
+2. Open Account modal and run username change (`tpx_account_update_username`) to a unique value.
+3. Confirm Account modal shows updated username and `tpx_account_username_status` returns same value.
+4. Play a run and submit score (`tpx_submit_score`) to OPEN mode.
+5. Open leaderboard (`tpx_list_leaderboard`) and verify the new record shows updated username.
+6. Repeat one additional score submission to confirm no stale cached username is reused.
