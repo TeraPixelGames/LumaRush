@@ -7,6 +7,7 @@ func before() -> void:
 	ProjectSettings.set_setting("lumarush/visual_test_mode", true)
 	ProjectSettings.set_setting("lumarush/audio_test_mode", true)
 	ProjectSettings.set_setting("lumarush/use_mock_ads", true)
+	RunManager.set_selected_mode("OPEN", "test")
 
 func test_remove_color_and_undo_restore_board() -> void:
 	var game: Control = await _spawn_game()

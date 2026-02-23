@@ -1,5 +1,14 @@
 extends GdUnitTestSuite
 
+var _original_mode: String = "PURE"
+
+func before_test() -> void:
+	_original_mode = RunManager.get_selected_mode()
+	RunManager.set_selected_mode("PURE", "test")
+
+func after_test() -> void:
+	RunManager.set_selected_mode(_original_mode, "test")
+
 func test_run_mode_switches_to_open_after_powerup_usage() -> void:
 	RunManager.set_run_leaderboard_context(0, 0, {})
 	assert_that(RunManager.last_run_leaderboard_mode).is_equal("PURE")
