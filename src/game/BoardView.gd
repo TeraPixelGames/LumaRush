@@ -7,6 +7,7 @@ signal move_committed(group: Array, snapshot: Array)
 signal match_click_haptic_triggered(duration_ms: int, amplitude: float)
 signal match_haptic_triggered(duration_ms: int, amplitude: float)
 signal prism_color_selected(color_idx: int)
+signal non_match_tapped(cell: Vector2i)
 
 @export var width := 8
 @export var height := 10
@@ -42,7 +43,9 @@ var _theme_tile_palette: Array = []
 
 func _ready() -> void:
 	_tile_gap_px = _gap_for_tile_size(tile_size)
-	var board_seed: int = 1234 if FeatureFlags.is_visual_test_mode() else -1
+	var board_seed: int = 1234 if FeatureFlags.is_visual_test_mode() else RunManager.consume_pending_daily_seed()
+	if board_seed <= 0:
+		board_seed = -1
 	_min_match_size = FeatureFlags.min_match_size()
 	colors = _palette_size()
 	board = Board.new(width, height, colors, board_seed, _min_match_size, _palette_size())
@@ -120,6 +123,7 @@ func _handle_click(pos: Vector2) -> void:
 		return
 	var group := board.find_group(Vector2i(x, y))
 	if group.size() < _min_match_size:
+		emit_signal("non_match_tapped", Vector2i(x, y))
 		return
 	_trigger_match_click_haptic()
 	_animating = true

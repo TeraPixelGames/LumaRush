@@ -41,6 +41,17 @@ var _run_coins_spent: int = 0
 var _open_tip_shown_this_run: bool = false
 var _pause_overlap_factor: float = 0.5
 var _audio_overlay
+var _current_mode: String = "PURE"
+var _pure_mode_locked: bool = false
+var _pure_mode_notice_shown: bool = false
+var _combo_label: Label
+var _tutorial_overlay: CanvasItem
+var _shake_strength: float = 0.0
+var _shake_time_left: float = 0.0
+var _board_anchor_pos: Vector2 = Vector2.ZERO
+var _scene_opened_msec: int = Time.get_ticks_msec()
+var _combo_timeout_remaining: float = -1.0
+const COMBO_BREAK_TIMEOUT_SECONDS: float = 1.8
 
 const ICON_UNDO: Texture2D = preload("res://assets/ui/icons/atlas/powerup_undo.tres")
 const ICON_PRISM: Texture2D = preload("res://assets/ui/icons/atlas/powerup_prism.tres")
@@ -66,6 +77,8 @@ func _ready() -> void:
 	modulate = Color(1, 1, 1, 1)
 	$BoardView.modulate = Color(1, 1, 1, 1)
 	$UI.modulate = Color(1, 1, 1, 1)
+	_current_mode = RunManager.get_selected_mode()
+	_pure_mode_locked = _current_mode == "PURE"
 	Typography.style_game(self)
 	ThemeManager.apply_to_scene(self)
 	BackgroundMood.register_controller($BackgroundController)
@@ -76,6 +89,8 @@ func _ready() -> void:
 	board.connect("match_made", Callable(self, "_on_match_made"))
 	board.connect("move_committed", Callable(self, "_on_move_committed"))
 	board.connect("no_moves", Callable(self, "_on_no_moves"))
+	if not board.is_connected("non_match_tapped", Callable(self, "_on_non_match_tapped")):
+		board.connect("non_match_tapped", Callable(self, "_on_non_match_tapped"))
 	if not board.is_connected("prism_color_selected", Callable(self, "_on_prism_color_selected")):
 		board.connect("prism_color_selected", Callable(self, "_on_prism_color_selected"))
 	if not AdManager.is_connected("rewarded_powerup_earned", Callable(self, "_on_powerup_rewarded_earned")):
@@ -111,11 +126,15 @@ func _ready() -> void:
 		button.clip_contents = false
 	_refresh_audio_icon()
 	powerup_flash.visible = false
+	_board_anchor_pos = board.position
+	_setup_combo_label()
+	_maybe_show_micro_tutorial()
 	_update_score()
 	_update_powerup_buttons()
 	_center_board()
 	call_deferred("_refresh_button_pivots")
 	_play_enter_transition()
+	Telemetry.mark_scene_loaded("game", _scene_opened_msec)
 
 func _notification(what: int) -> void:
 	if what == Control.NOTIFICATION_RESIZED:
@@ -123,20 +142,37 @@ func _notification(what: int) -> void:
 		_center_board()
 		call_deferred("_refresh_button_pivots")
 
+func _process(delta: float) -> void:
+	_tick_combo_timeout(delta)
+	if _shake_time_left <= 0.0:
+		if board and board.position != _board_anchor_pos:
+			board.position = _board_anchor_pos
+		return
+	_shake_time_left = max(0.0, _shake_time_left - delta)
+	var amplitude : float = max(0.0, _shake_strength * (_shake_time_left / 0.12))
+	var jitter := Vector2(randf_range(-amplitude, amplitude), randf_range(-amplitude, amplitude))
+	if board:
+		board.position = _board_anchor_pos + jitter
+
 func _on_match_made(group: Array) -> void:
 	combo += 1
+	_arm_combo_timeout()
 	var gained := group.size() * 10 * combo
 	score += gained
 	_update_score()
+	UiFx.pop(score_value_label, 1.04, 0.14)
+	_show_combo_escalation()
+	_kick_screen_shake(min(11.0, 2.0 + float(group.size()) + (combo * 0.35)))
 	_update_gameplay_mood_from_matches()
 	BackgroundMood.reset_starfield_emission_taper()
 	BackgroundMood.pulse_starfield()
-	MusicManager.on_match_made()
-	if combo == HIGH_COMBO_THRESHOLD:
-		MusicManager.maybe_trigger_high_combo_fx()
+	_play_feedback_tier(group.size())
 
 func _on_move_committed(_group: Array, snapshot: Array) -> void:
 	_push_undo(snapshot, score, combo)
+
+func _on_non_match_tapped(_cell: Vector2i) -> void:
+	_break_combo()
 
 func _update_score() -> void:
 	score_value_label.text = "%d" % score
@@ -161,6 +197,9 @@ func _on_quit() -> void:
 	_finish_run(false)
 
 func _on_undo_pressed() -> void:
+	if _pure_mode_locked:
+		_show_pure_mode_notice()
+		return
 	if _prism_selecting:
 		return
 	if _undo_charges <= 0:
@@ -176,6 +215,10 @@ func _on_undo_pressed() -> void:
 	board.restore_snapshot(state["grid"] as Array)
 	score = int(state["score"])
 	combo = int(state["combo"])
+	if combo > 0:
+		_arm_combo_timeout()
+	else:
+		_combo_timeout_remaining = -1.0
 	_undo_charges -= 1
 	_record_powerup_use("undo")
 	call_deferred("_consume_powerup_server", "undo")
@@ -185,6 +228,9 @@ func _on_undo_pressed() -> void:
 	_play_powerup_juice(Color(0.72, 0.9, 1.0, FeatureFlags.powerup_flash_alpha()))
 
 func _on_remove_color_pressed() -> void:
+	if _pure_mode_locked:
+		_show_pure_mode_notice()
+		return
 	if _prism_selecting:
 		_set_prism_selection(false)
 		_update_powerup_buttons()
@@ -219,6 +265,7 @@ func _on_prism_color_selected(color_idx: int) -> void:
 	_record_powerup_use("prism")
 	call_deferred("_consume_powerup_server", "prism")
 	combo += 1
+	_arm_combo_timeout()
 	score += removed * 12
 	_update_score()
 	_update_gameplay_mood_from_matches(0.3)
@@ -227,6 +274,9 @@ func _on_prism_color_selected(color_idx: int) -> void:
 	_play_powerup_juice(Color(1.0, 0.92, 0.7, FeatureFlags.powerup_flash_alpha()))
 
 func _on_hint_pressed() -> void:
+	if _pure_mode_locked:
+		_show_pure_mode_notice()
+		return
 	if _prism_selecting:
 		return
 	if _hint_charges <= 0:
@@ -263,9 +313,20 @@ func _update_powerup_buttons() -> void:
 	var prism_hint: String = "Tap Color" if _prism_selecting else ""
 	_update_badge(prism_badge_panel, prism_badge, _remove_color_charges, _pending_powerup_refill_type == "prism", prism_hint)
 	_update_badge(hint_badge_panel, hint_badge, _hint_charges, _pending_powerup_refill_type == "hint")
-	undo_button.disabled = (_undo_charges > 0 and _undo_stack.is_empty()) or _is_other_refill_pending("undo") or _prism_selecting
-	remove_color_button.disabled = _is_other_refill_pending("prism")
-	hint_button.disabled = _is_other_refill_pending("hint") or _prism_selecting
+	if _pure_mode_locked:
+		undo_button.disabled = true
+		remove_color_button.disabled = true
+		hint_button.disabled = true
+		undo_button.tooltip_text = "PURE mode disables powerups"
+		remove_color_button.tooltip_text = "PURE mode disables powerups"
+		hint_button.tooltip_text = "PURE mode disables powerups"
+	else:
+		undo_button.disabled = (_undo_charges > 0 and _undo_stack.is_empty()) or _is_other_refill_pending("undo") or _prism_selecting
+		remove_color_button.disabled = _is_other_refill_pending("prism")
+		hint_button.disabled = _is_other_refill_pending("hint") or _prism_selecting
+		undo_button.tooltip_text = "Undo"
+		remove_color_button.tooltip_text = "Tap a tile color to clear it" if _prism_selecting else "Prism"
+		hint_button.tooltip_text = "Hint"
 
 func _push_undo(snapshot: Array, score_snapshot: int, combo_snapshot: int) -> void:
 	_undo_stack.append({
@@ -365,6 +426,7 @@ func _record_powerup_use(powerup_type: String) -> void:
 		_powerup_usage[powerup_type] = 0
 	_powerup_usage[powerup_type] = int(_powerup_usage[powerup_type]) + 1
 	_run_powerups_used_total += 1
+	Telemetry.mark_powerup_used(powerup_type, "OPEN", _remaining_powerup_charges(powerup_type))
 	_maybe_show_open_mode_tip()
 
 func _maybe_show_open_mode_tip() -> void:
@@ -586,6 +648,7 @@ func _finish_run(completed_by_gameplay: bool) -> void:
 	if _ending_transition_started:
 		return
 	_close_audio_overlay()
+	_combo_timeout_remaining = -1.0
 	get_tree().paused = false
 	_ending_transition_started = true
 	_set_prism_selection(false)
@@ -676,6 +739,7 @@ func _center_board() -> void:
 		(view_size.x - board_size.x) * 0.5,
 		top_limit + ((available_height - board_size.y) * 0.5)
 	)
+	_board_anchor_pos = board.position
 
 	powerup_row_width = clamp(board_size.x + max(84.0, board.tile_size * 0.8), min_row_width, max_row_width)
 	_layout_powerups(view_size, powerup_row_width, powerup_row_height)
@@ -792,3 +856,157 @@ func _queue_pause_button_overlap_position() -> void:
 
 func _queue_pause_button_overlap_position_deferred() -> void:
 	call_deferred("_position_pause_button_overlap")
+
+func _setup_combo_label() -> void:
+	if _combo_label != null:
+		return
+	_combo_label = Label.new()
+	_combo_label.name = "ComboEscalation"
+	_combo_label.visible = false
+	_combo_label.text = ""
+	_combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_combo_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_combo_label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.5, 0.98))
+	_combo_label.add_theme_color_override("font_outline_color", Color(0.08, 0.12, 0.22, 0.95))
+	_combo_label.add_theme_constant_override("outline_size", 3)
+	_combo_label.add_theme_font_size_override("font_size", 34)
+	_combo_label.anchor_left = 0.5
+	_combo_label.anchor_right = 0.5
+	_combo_label.anchor_top = 0.0
+	_combo_label.anchor_bottom = 0.0
+	_combo_label.offset_left = -160.0
+	_combo_label.offset_right = 160.0
+	_combo_label.offset_top = 96.0
+	_combo_label.offset_bottom = 146.0
+	_combo_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$UI.add_child(_combo_label)
+
+func _show_combo_escalation() -> void:
+	if _combo_label == null or combo < 2:
+		return
+	_combo_label.visible = true
+	_combo_label.modulate = Color(1, 1, 1, 1)
+	_combo_label.text = "COMBO x%d" % combo
+	_combo_label.position.y = 82.0
+	var tween := create_tween()
+	tween.tween_property(_combo_label, "modulate:a", 1.0, 0.06)
+	tween.parallel().tween_property(_combo_label, "position:y", 64.0, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_combo_label, "modulate:a", 0.0, 0.38)
+	tween.finished.connect(func() -> void:
+		if _combo_label:
+			_combo_label.visible = false
+	)
+
+func _kick_screen_shake(strength: float) -> void:
+	_shake_strength = max(_shake_strength, strength)
+	_shake_time_left = 0.12
+
+func _play_feedback_tier(group_size: int) -> void:
+	MusicManager.on_match_made()
+	if combo >= HIGH_COMBO_THRESHOLD:
+		MusicManager.maybe_trigger_high_combo_fx()
+	if combo >= 7 or group_size >= 6:
+		MusicManager.maybe_trigger_high_combo_fx()
+	_kick_screen_shake(min(14.0, 3.0 + float(combo) * 0.55))
+
+func _maybe_show_micro_tutorial() -> void:
+	if SaveStore.is_tutorial_seen():
+		return
+	var panel := PanelContainer.new()
+	panel.name = "TutorialOverlay"
+	panel.anchor_left = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_top = 0.0
+	panel.anchor_bottom = 0.0
+	panel.offset_left = -220.0
+	panel.offset_right = 220.0
+	panel.offset_top = 18.0
+	panel.offset_bottom = 114.0
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.07, 0.1, 0.18, 0.74)
+	style.border_color = Color(0.55, 0.9, 1.0, 0.6)
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.corner_radius_top_left = 18
+	style.corner_radius_top_right = 18
+	style.corner_radius_bottom_left = 18
+	style.corner_radius_bottom_right = 18
+	panel.add_theme_stylebox_override("panel", style)
+	var label := Label.new()
+	label.anchor_right = 1.0
+	label.anchor_bottom = 1.0
+	label.offset_left = 14.0
+	label.offset_top = 10.0
+	label.offset_right = -14.0
+	label.offset_bottom = -10.0
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.text = "Tip: Chain matches quickly to escalate combo multipliers."
+	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_color_override("font_color", Color(0.93, 0.97, 1.0, 0.98))
+	panel.add_child(label)
+	$UI.add_child(panel)
+	_tutorial_overlay = panel
+	await get_tree().create_timer(5.0).timeout
+	if _tutorial_overlay and is_instance_valid(_tutorial_overlay):
+		var tween := create_tween()
+		tween.tween_property(_tutorial_overlay, "modulate:a", 0.0, 0.35)
+		await tween.finished
+		if _tutorial_overlay and is_instance_valid(_tutorial_overlay):
+			_tutorial_overlay.queue_free()
+	_tutorial_overlay = null
+	SaveStore.set_tutorial_seen(true)
+
+func _show_pure_mode_notice() -> void:
+	if _pure_mode_notice_shown:
+		return
+	_pure_mode_notice_shown = true
+	var modal := TUTORIAL_TIP_SCENE.instantiate()
+	if modal and modal.has_method("configure"):
+		modal.configure({
+			"title": "PURE Mode Active",
+			"message": "Powerups are disabled in PURE mode. Switch to OPEN in the main menu to use them.",
+			"confirm_text": "Understood",
+			"show_checkbox": false,
+		})
+	add_child(modal)
+
+func _remaining_powerup_charges(powerup_type: String) -> int:
+	match powerup_type:
+		"undo":
+			return _undo_charges
+		"prism":
+			return _remove_color_charges
+		"hint":
+			return _hint_charges
+	return 0
+
+func _arm_combo_timeout() -> void:
+	if combo <= 0:
+		_combo_timeout_remaining = -1.0
+		return
+	_combo_timeout_remaining = COMBO_BREAK_TIMEOUT_SECONDS
+
+func _tick_combo_timeout(delta: float) -> void:
+	if combo <= 0:
+		_combo_timeout_remaining = -1.0
+		return
+	if _ending_transition_started or _run_finished:
+		return
+	if get_tree().paused:
+		return
+	if _combo_timeout_remaining <= 0.0:
+		return
+	_combo_timeout_remaining = max(0.0, _combo_timeout_remaining - delta)
+	if _combo_timeout_remaining <= 0.0:
+		_break_combo()
+
+func _break_combo() -> void:
+	if combo <= 0:
+		return
+	combo = 0
+	_combo_timeout_remaining = -1.0

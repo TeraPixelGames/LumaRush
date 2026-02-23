@@ -31,6 +31,10 @@ var _double_reward_pending: bool = false
 var _base_reward_amount: int = 0
 var _audio_overlay: AudioTrackOverlay
 var _intro_tween: Tween
+var _powerups_label: Label
+var _encouragement_label: Label
+var _unlock_progress: ProgressBar
+var _dual_leaderboard_label: Label
 
 func _ready() -> void:
 	BackgroundMood.register_controller($BackgroundController)
@@ -41,8 +45,11 @@ func _ready() -> void:
 	ThemeManager.apply_to_scene(self)
 	_refresh_audio_icon()
 	_layout_results()
+	call_deferred("_layout_results")
+	_ensure_dynamic_stats()
 	_refresh_intro_pivots()
 	_update_labels()
+	call_deferred("_reset_scroll_top")
 	_bind_online_signals()
 	_sync_online_results()
 	_sync_wallet_rewards()
@@ -52,6 +59,7 @@ func _ready() -> void:
 		add_child(modal)
 	if not AdManager.is_connected("rewarded_powerup_earned", Callable(self, "_on_double_reward_ad_earned")):
 		AdManager.connect("rewarded_powerup_earned", Callable(self, "_on_double_reward_ad_earned"))
+	Telemetry.mark_scene_loaded("results", Time.get_ticks_msec() - 1)
 
 func _update_labels() -> void:
 	score_label.text = "%d" % RunManager.last_score
@@ -68,6 +76,14 @@ func _update_labels() -> void:
 	streak_label.text = "Streak: %d" % StreakManager.get_streak_days()
 	online_status_label.text = "Online: %s" % NakamaService.get_online_status()
 	leaderboard_label.text = _format_leaderboard(NakamaService.get_leaderboard_records())
+	if _powerups_label:
+		_powerups_label.text = "Powerups used: %d" % RunManager.last_run_powerups_used
+	if _encouragement_label:
+		_encouragement_label.text = _build_encouragement_text(local_best, best_value)
+	if _unlock_progress:
+		_unlock_progress.value = SaveStore.get_unlock_progress() * 100.0
+	if _dual_leaderboard_label:
+		_dual_leaderboard_label.text = ""
 	coin_balance_label.text = "Coins balance: %d" % NakamaService.get_coin_balance()
 	if _base_reward_claimed:
 		coins_earned_label.text = "Coins earned: %d" % _base_reward_amount
@@ -139,15 +155,15 @@ func _layout_results_for_size(viewport_size: Vector2) -> void:
 
 	var viewport_aspect: float = viewport_size.x / max(1.0, viewport_size.y)
 	var is_wide: bool = viewport_aspect >= 1.55
-	var outer_margin_x: float = clamp(viewport_size.x * 0.035, 14.0, 56.0)
-	var outer_margin_y: float = clamp(viewport_size.y * 0.035, 12.0, 34.0)
+	var outer_margin_x: float = clamp(viewport_size.x * 0.028, 10.0, 44.0)
+	var outer_margin_y: float = clamp(viewport_size.y * 0.022, 8.0, 24.0)
 	var max_panel_width: float = max(360.0, viewport_size.x - (outer_margin_x * 2.0))
 	var min_panel_width: float = min(460.0, max_panel_width)
 	var target_panel_width: float = viewport_size.x * (0.62 if is_wide else 0.82)
 	var panel_width: float = clamp(target_panel_width, min_panel_width, min(1040.0, max_panel_width))
 	var max_panel_height: float = max(320.0, viewport_size.y - (outer_margin_y * 2.0))
-	var min_panel_height: float = min(500.0, max_panel_height)
-	var target_panel_height: float = viewport_size.y * (0.9 if is_wide else 0.75)
+	var min_panel_height: float = min(460.0, max_panel_height)
+	var target_panel_height: float = viewport_size.y * (0.94 if is_wide else 0.82)
 	var panel_height: float = clamp(target_panel_height, min_panel_height, max_panel_height)
 	var panel_size: Vector2 = Vector2(panel_width, panel_height)
 	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -155,33 +171,35 @@ func _layout_results_for_size(viewport_size: Vector2) -> void:
 	panel.size = panel_size
 	_layout_top_right(viewport_size)
 
-	var margin_x: float = clamp(panel_size.x * 0.055, 20.0, 44.0)
-	var margin_y: float = clamp(panel_size.y * 0.045, 16.0, 34.0)
+	var margin_x: float = clamp(panel_size.x * 0.04, 14.0, 30.0)
+	var margin_y: float = clamp(panel_size.y * 0.03, 10.0, 24.0)
 	var content_size: Vector2 = panel_size - Vector2(margin_x * 2.0, margin_y * 2.0)
 	var use_split: bool = viewport_aspect >= 1.45
 	_configure_stats_split(content_size, use_split)
-	var base_separation: float = clamp(round(content_size.y * 0.01), 6.0, 16.0)
+	if spacer:
+		spacer.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var base_separation: float = clamp(round(content_size.y * 0.008), 4.0, 12.0)
 	var compact_scale: float = 1.0
 	for _i in range(6):
-		var separation: int = int(clamp(round(base_separation * compact_scale), 6.0, 16.0))
+		var separation: int = int(clamp(round(base_separation * compact_scale), 4.0, 12.0))
 		box.add_theme_constant_override("separation", separation)
 		_apply_responsive_typography(content_size, viewport_aspect, use_split, compact_scale)
 
-		var secondary_button_height: float = clamp(content_size.y * (0.068 if is_wide else 0.062) * compact_scale, 34.0, 84.0)
-		var primary_button_height: float = clamp(content_size.y * (0.088 if is_wide else 0.092) * compact_scale, 42.0, 104.0)
+		var secondary_button_height: float = clamp(content_size.y * (0.056 if is_wide else 0.052) * compact_scale, 28.0, 62.0)
+		var primary_button_height: float = clamp(content_size.y * (0.072 if is_wide else 0.07) * compact_scale, 34.0, 72.0)
 		double_reward_button.custom_minimum_size.y = secondary_button_height
 		if play_again_button:
 			play_again_button.custom_minimum_size.y = primary_button_height
 		if menu_button:
 			menu_button.custom_minimum_size.y = primary_button_height
 		if spacer:
-			spacer.custom_minimum_size.y = max(0.0, round(content_size.y * 0.015 * compact_scale))
+			spacer.custom_minimum_size.y = max(0.0, round(content_size.y * 0.008 * compact_scale))
 
 		var required_height: float = box.get_combined_minimum_size().y
 		if required_height <= content_size.y:
 			break
 		var fit_ratio: float = content_size.y / max(1.0, required_height)
-		var next_scale: float = clamp(compact_scale * fit_ratio, 0.5, compact_scale)
+		var next_scale: float = clamp(compact_scale * fit_ratio, 0.42, compact_scale)
 		if absf(next_scale - compact_scale) < 0.01:
 			break
 		compact_scale = next_scale
@@ -190,12 +208,13 @@ func _layout_results_for_size(viewport_size: Vector2) -> void:
 	scroll.position = Vector2(margin_x, margin_y)
 	scroll.size = content_size
 
+	box.alignment = BoxContainer.ALIGNMENT_BEGIN
 	box.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	box.position = Vector2.ZERO
-	box.size = Vector2(content_size.x, content_size.y)
-	box.custom_minimum_size = Vector2(content_size.x, 0.0)
 	var content_min_height: float = box.get_combined_minimum_size().y
-	box.custom_minimum_size.y = max(content_size.y, content_min_height)
+	box.size = Vector2(content_size.x, max(content_size.y, content_min_height))
+	box.custom_minimum_size = Vector2(content_size.x, 0.0)
+	box.custom_minimum_size.y = content_min_height
 
 func _layout_top_right(viewport_size: Vector2) -> void:
 	if top_right_bar == null or audio_button == null:
@@ -242,14 +261,14 @@ func _apply_responsive_typography(content_size: Vector2, viewport_aspect: float,
 	var stat_column_width: float = max(220.0, (content_size.x - split_gap) * 0.5) if use_split else content_size.x
 	var menu_title_px: int = Typography.px(Typography.SIZE_MENU_TITLE)
 	var menu_button_px: int = Typography.px(Typography.SIZE_BUTTON)
-	var title_size: int = int(round(clamp(float(menu_title_px) * 0.82 * headline_scale, 34.0, 124.0)))
-	var score_size: int = int(round(clamp(max(float(menu_title_px) * 0.92, stat_column_width * 0.14) * headline_scale, 44.0, 156.0)))
-	var mode_size: int = int(round(clamp(float(menu_button_px) * 0.7 * compact_scale, 14.0, 48.0)))
-	var stat_size: int = int(round(clamp(float(menu_button_px) * 0.84 * compact_scale, 18.0, 58.0)))
-	var body_size: int = int(round(clamp(float(menu_button_px) * 0.72 * compact_scale, 14.0, 44.0)))
-	var coin_size: int = int(round(clamp(float(menu_button_px) * 0.76 * compact_scale, 14.0, 46.0)))
-	var reward_button_size: int = int(round(clamp(float(menu_button_px) * 0.74 * action_scale, 14.0, 40.0)))
-	var primary_button_size: int = int(round(clamp(float(menu_button_px) * (0.86 if is_wide else 0.92) * action_scale, 17.0, 56.0)))
+	var title_size: int = int(round(clamp(float(menu_title_px) * 0.72 * headline_scale, 26.0, 106.0)))
+	var score_size: int = int(round(clamp(max(float(menu_title_px) * 0.8, stat_column_width * 0.12) * headline_scale, 34.0, 128.0)))
+	var mode_size: int = int(round(clamp(float(menu_button_px) * 0.62 * compact_scale, 12.0, 40.0)))
+	var stat_size: int = int(round(clamp(float(menu_button_px) * 0.74 * compact_scale, 16.0, 48.0)))
+	var body_size: int = int(round(clamp(float(menu_button_px) * 0.64 * compact_scale, 12.0, 36.0)))
+	var coin_size: int = int(round(clamp(float(menu_button_px) * 0.68 * compact_scale, 12.0, 38.0)))
+	var reward_button_size: int = int(round(clamp(float(menu_button_px) * 0.66 * action_scale, 12.0, 32.0)))
+	var primary_button_size: int = int(round(clamp(float(menu_button_px) * (0.76 if is_wide else 0.82) * action_scale, 14.0, 42.0)))
 
 	if title_label:
 		title_label.add_theme_font_size_override("font_size", title_size)
@@ -270,6 +289,12 @@ func _apply_responsive_typography(content_size: Vector2, viewport_aspect: float,
 		coins_earned_label.add_theme_font_size_override("font_size", coin_size)
 	if coin_balance_label:
 		coin_balance_label.add_theme_font_size_override("font_size", coin_size)
+	if _powerups_label:
+		_powerups_label.add_theme_font_size_override("font_size", body_size)
+	if _encouragement_label:
+		_encouragement_label.add_theme_font_size_override("font_size", body_size)
+	if _dual_leaderboard_label:
+		_dual_leaderboard_label.add_theme_font_size_override("font_size", int(round(body_size * 0.92)))
 	if double_reward_button:
 		double_reward_button.add_theme_font_size_override("font_size", reward_button_size)
 	if play_again_button:
@@ -298,12 +323,15 @@ func _sync_online_results() -> void:
 	var mode: String = String(RunManager.last_run_leaderboard_mode).strip_edges().to_upper()
 	if mode.is_empty():
 		mode = "PURE"
-	await NakamaService.submit_score(RunManager.last_score, {
+	await LeaderboardService.submit_and_refresh(RunManager.last_score, {
 		"source": "results_ready",
 		"run_id": RunManager.last_run_id,
 		"powerup_breakdown": RunManager.last_run_powerup_breakdown.duplicate(true),
 	}, mode, RunManager.last_run_powerups_used, RunManager.last_run_coins_spent, RunManager.last_run_id, RunManager.last_run_duration_ms)
-	await NakamaService.refresh_my_high_score(mode)
+	var alternate_mode := "OPEN" if mode == "PURE" else "PURE"
+	var alt_result := await NakamaService.refresh_leaderboard(3, alternate_mode)
+	if _dual_leaderboard_label and alt_result.get("ok", false):
+		_dual_leaderboard_label.text = _format_alt_mode_leaderboard(alternate_mode, NakamaService.get_leaderboard_records())
 	await NakamaService.refresh_leaderboard(5, mode)
 
 func _sync_wallet_rewards() -> void:
@@ -454,6 +482,78 @@ func _refresh_audio_icon() -> void:
 	var label: String = "Audio Off" if muted else "Audio"
 	audio_button.set("tooltip_text_override", label)
 	audio_button.set("accessibility_name_override", label)
+
+func _ensure_dynamic_stats() -> void:
+	if box == null:
+		return
+	if _powerups_label == null:
+		_powerups_label = Label.new()
+		_powerups_label.name = "PowerupsUsed"
+		_powerups_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(_powerups_label)
+		_move_before_spacer(_powerups_label)
+	if _encouragement_label == null:
+		_encouragement_label = Label.new()
+		_encouragement_label.name = "Encouragement"
+		_encouragement_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_encouragement_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_encouragement_label.add_theme_color_override("font_color", Color(0.92, 0.97, 1.0, 0.96))
+		box.add_child(_encouragement_label)
+		_move_before_spacer(_encouragement_label)
+	if _unlock_progress == null:
+		_unlock_progress = ProgressBar.new()
+		_unlock_progress.name = "UnlockProgress"
+		_unlock_progress.min_value = 0.0
+		_unlock_progress.max_value = 100.0
+		_unlock_progress.value = 0.0
+		_unlock_progress.custom_minimum_size.y = 22.0
+		box.add_child(_unlock_progress)
+		_move_before_spacer(_unlock_progress)
+	if _dual_leaderboard_label == null:
+		_dual_leaderboard_label = Label.new()
+		_dual_leaderboard_label.name = "AltLeaderboard"
+		_dual_leaderboard_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_dual_leaderboard_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(_dual_leaderboard_label)
+		_move_before_spacer(_dual_leaderboard_label)
+
+func _move_before_spacer(node: Control) -> void:
+	if box == null or spacer == null:
+		return
+	var spacer_index: int = spacer.get_index()
+	box.move_child(node, max(0, spacer_index))
+
+func _reset_scroll_top() -> void:
+	if scroll == null:
+		return
+	scroll.scroll_vertical = 0
+	scroll.scroll_horizontal = 0
+
+func _build_encouragement_text(local_best: int, best_value: int) -> String:
+	if best_value <= 0:
+		return "Great opener. Keep chaining for a bigger score."
+	if RunManager.last_score >= best_value:
+		return "New benchmark. The next run can push even higher."
+	var delta : int = max(0, best_value - RunManager.last_score)
+	if delta <= 150:
+		return "You were close! Just %d more for a new best." % delta
+	return "Solid run. You're %d away from your best." % delta
+
+func _format_alt_mode_leaderboard(mode_id: String, records: Array) -> String:
+	if records.is_empty():
+		return "%s leaderboard is waiting for records." % mode_id.capitalize()
+	var lines: Array[String] = []
+	for i in range(min(2, records.size())):
+		var row_var: Variant = records[i]
+		if typeof(row_var) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_var
+		lines.append("%d) %s - %d" % [
+			int(row.get("rank", i + 1)),
+			str(row.get("username", "Player")),
+			int(row.get("score", 0)),
+		])
+	return "%s Preview\n%s" % [mode_id.capitalize(), "\n".join(lines)]
 
 func _notification(what: int) -> void:
 	if what == Control.NOTIFICATION_RESIZED:

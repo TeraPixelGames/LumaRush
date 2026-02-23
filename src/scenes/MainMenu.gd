@@ -1,8 +1,11 @@
 extends Control
 
 const AUDIO_TRACK_OVERLAY_SCENE := preload("res://src/scenes/AudioTrackOverlay.tscn")
+const ACCOUNT_MODAL_SCENE := preload("res://src/scenes/AccountModal.tscn")
+const SHOP_MODAL_SCENE := preload("res://src/scenes/ShopModal.tscn")
 const ICON_MUSIC_ON := preload("res://assets/ui/icons/atlas/music_on.tres")
 const ICON_MUSIC_OFF := preload("res://assets/ui/icons/atlas/music_off.tres")
+const PROMO_URL := "https://terapixel.games/color-crunch"
 
 @onready var root_margin: MarginContainer = $UI/RootMargin
 @onready var panel_shell: PanelContainer = $UI/RootMargin/Layout/Center/PanelShell
@@ -10,6 +13,7 @@ const ICON_MUSIC_OFF := preload("res://assets/ui/icons/atlas/music_off.tres")
 @onready var content_margin: MarginContainer = $UI/RootMargin/Layout/Center/PanelShell/Panel/ContentMargin
 @onready var title_label: Label = $UI/RootMargin/Layout/Center/PanelShell/Panel/ContentMargin/VBox/Title
 @onready var start_button: Button = $UI/RootMargin/Layout/Center/PanelShell/Panel/ContentMargin/VBox/Start
+@onready var panel_vbox: VBoxContainer = $UI/RootMargin/Layout/Center/PanelShell/Panel/ContentMargin/VBox
 @onready var audio_button: Button = $UI/RootMargin/Layout/TopBar/Audio
 @onready var account_button: Button = $UI/RootMargin/Layout/TopBar/Account
 @onready var shop_button: Button = $UI/RootMargin/Layout/BottomBar/Shop
@@ -22,6 +26,10 @@ var _title_accent_color: Color = Color(0.78, 0.88, 1.0, 1.0)
 var _tracks: Array[Dictionary] = []
 var _track_index: int = 0
 var _audio_overlay
+var _mode_button: Button
+var _daily_button: Button
+var _promo_button: Button
+var _scene_opened_msec: int = Time.get_ticks_msec()
 const BADGE_BG_COLOR: Color = Color(0.96, 0.22, 0.24, 1.0)
 const BADGE_BORDER_COLOR: Color = Color(1.0, 0.9, 0.92, 0.96)
 
@@ -42,6 +50,8 @@ func _ready() -> void:
 	_layout_menu()
 	call_deferred("_layout_menu")
 	_style_coin_badge()
+	_ensure_action_buttons()
+	_sync_mode_buttons()
 	title_label.add_theme_color_override("font_color", _title_base_color)
 	_populate_track_options()
 	_refresh_audio_icon()
@@ -51,6 +61,7 @@ func _ready() -> void:
 	await NakamaService.refresh_wallet(false)
 	_apply_wallet_to_ui(NakamaService.get_wallet())
 	start_button.disabled = false
+	Telemetry.mark_scene_loaded("main_menu", _scene_opened_msec)
 
 func _process(delta: float) -> void:
 	if FeatureFlags.is_visual_test_mode():
@@ -108,11 +119,11 @@ func _refresh_title_pivots() -> void:
 		title_label.pivot_offset = title_label.size * 0.5
 
 func _on_start_pressed() -> void:
+	Telemetry.mark_mode_selected(RunManager.get_selected_mode(), "menu_start")
 	RunManager.start_game()
 
 func _on_account_pressed() -> void:
-	var modal := preload("res://src/scenes/AccountModal.tscn").instantiate()
-	add_child(modal)
+	ModalManager.open_scene(ACCOUNT_MODAL_SCENE, self)
 
 func _on_audio_pressed() -> void:
 	if is_instance_valid(_audio_overlay):
@@ -129,8 +140,7 @@ func _on_audio_pressed() -> void:
 	overlay.closed.connect(_on_audio_overlay_closed)
 
 func _on_shop_pressed() -> void:
-	var modal := preload("res://src/scenes/ShopModal.tscn").instantiate()
-	add_child(modal)
+	ModalManager.open_scene(SHOP_MODAL_SCENE, self)
 
 func _on_wallet_updated(wallet: Dictionary) -> void:
 	_apply_wallet_to_ui(wallet)
@@ -237,3 +247,54 @@ func _layout_coin_badge(icon_size: float) -> void:
 	coin_badge_panel.offset_right = radius
 	coin_badge_panel.offset_bottom = radius
 	coin_badge_panel.z_index = 10
+
+func _ensure_action_buttons() -> void:
+	if panel_vbox == null:
+		return
+	if _mode_button == null:
+		_mode_button = Button.new()
+		_mode_button.name = "ModeToggle"
+		_mode_button.custom_minimum_size.y = 62.0
+		_mode_button.pressed.connect(_on_mode_toggle_pressed)
+		panel_vbox.add_child(_mode_button)
+		panel_vbox.move_child(_mode_button, panel_vbox.get_child_count() - 1)
+	if _daily_button == null:
+		_daily_button = Button.new()
+		_daily_button.name = "DailyToggle"
+		_daily_button.custom_minimum_size.y = 58.0
+		_daily_button.pressed.connect(_on_daily_toggle_pressed)
+		panel_vbox.add_child(_daily_button)
+		panel_vbox.move_child(_daily_button, panel_vbox.get_child_count() - 1)
+	if _promo_button == null:
+		_promo_button = Button.new()
+		_promo_button.name = "CrossPromo"
+		_promo_button.text = "Play ColorCrunch"
+		_promo_button.custom_minimum_size.y = 52.0
+		_promo_button.pressed.connect(_on_promo_pressed)
+		panel_vbox.add_child(_promo_button)
+		panel_vbox.move_child(_promo_button, panel_vbox.get_child_count() - 1)
+	UiFx.fade_in(_mode_button, 0.14)
+	UiFx.fade_in(_daily_button, 0.14)
+	UiFx.fade_in(_promo_button, 0.14)
+
+func _sync_mode_buttons() -> void:
+	if _mode_button == null or _daily_button == null:
+		return
+	var mode_id := RunManager.get_selected_mode()
+	_mode_button.text = "Leaderboard Mode: %s" % mode_id
+	_daily_button.text = "Daily Challenge: %s" % ("On" if SaveStore.get_daily_challenge_enabled() else "Off")
+
+func _on_mode_toggle_pressed() -> void:
+	var next_mode := "OPEN" if RunManager.get_selected_mode() == "PURE" else "PURE"
+	RunManager.set_selected_mode(next_mode, "menu_toggle")
+	_sync_mode_buttons()
+	UiFx.pop(_mode_button)
+
+func _on_daily_toggle_pressed() -> void:
+	var next_value := not SaveStore.get_daily_challenge_enabled()
+	RunManager.set_daily_challenge_enabled(next_value)
+	_sync_mode_buttons()
+	UiFx.pop(_daily_button)
+
+func _on_promo_pressed() -> void:
+	OS.shell_open(PROMO_URL)

@@ -65,7 +65,7 @@ horizontal_scroll_mode = 0
 
 [node name="VBox" type="VBoxContainer" parent="UI/Panel/Scroll"]
 size_flags_horizontal = 3
-alignment = 1
+alignment = 0
 theme_override_constants/separation = 24
 
 [node name="Title" type="Label" parent="UI/Panel/Scroll/VBox"]
@@ -133,7 +133,6 @@ size_flags_horizontal = 3
 custom_minimum_size = Vector2(0, 88)
 
 [node name="Spacer" type="Control" parent="UI/Panel/Scroll/VBox"]
-size_flags_vertical = 3
 
 [node name="PlayAgain" type="Button" parent="UI/Panel/Scroll/VBox"]
 script = ExtResource( 5 )
