@@ -30,6 +30,11 @@ if [ -z "${NAKAMA_RUNTIME_HTTP_KEY:-}" ]; then
   exit 1
 fi
 
+if [ -z "${NAKAMA_CONSOLE_PASSWORD:-}" ]; then
+  echo "Missing NAKAMA_CONSOLE_PASSWORD"
+  exit 1
+fi
+
 DB_ADDRESS="${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 RUNTIME_ENV_TPX_AUTH="${TPX_PLATFORM_AUTH_URL:-}"
 RUNTIME_ENV_TPX_EVENT="${TPX_PLATFORM_EVENT_URL:-}"
@@ -72,7 +77,7 @@ socket:
 console:
   port: ${NAKAMA_CONSOLE_PORT}
   username: "${NAKAMA_CONSOLE_USERNAME:-admin}"
-  password: "${NAKAMA_CONSOLE_PASSWORD:-adminpassword}"
+  password: "${NAKAMA_CONSOLE_PASSWORD}"
 runtime:
   path: "/nakama/data/modules"
   js_entrypoint: "lumarush.js"
