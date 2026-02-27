@@ -54,7 +54,7 @@ enabled=PackedStringArray("res://addons/AdmobPlugin/plugin.cfg", "res://addons/g
 [lumarush]
 
 nakama_enable_client=true
-nakama_base_url="https://lumarush-nakama.onrender.com"
+nakama_base_url="https://terapixel.games/nakama/lumarush"
 nakama_server_key="RF0fcDiNclh0ZdjfBgXgFPj/9+UcSWigdtfkw/aUb5I="
 nakama_leaderboard_limit=10
 platform="terapixel"

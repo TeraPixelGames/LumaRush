@@ -147,7 +147,7 @@ If the Terapixel auth URL is unset, Nakama auth proceeds without external verifi
 - `tpx_account_username_status`: returns current username + free/paid rename policy.
 - `tpx_account_update_username`: validates and updates username (first change free, then coins).
 
-## Deploy on Render
+## Deploy on Render (fallback)
 
 This repo now includes a Render Blueprint at `render.yaml` for a managed Postgres database plus a Docker-based Nakama web service.
 
@@ -166,3 +166,14 @@ On Render:
 
 - API/Client endpoints: `https://<your-service>.onrender.com/`
 - Console: `https://<your-service>.onrender.com/console/`
+
+## Deploy on Cloud Run (primary)
+
+Cloud Run deployment scaffolding is available under `backend/nakama/cloudrun/`.
+
+1. Build and push image with `backend/nakama/Dockerfile.render`.
+2. Create the required Secret Manager secrets (`nakama-db-address`, `nakama-server-key`, etc.).
+3. Render placeholders in `backend/nakama/cloudrun/service.template.yaml`.
+4. Apply with `gcloud run services replace`.
+
+Use `backend/nakama/cloudrun/README.md` for exact commands.
