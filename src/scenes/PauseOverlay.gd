@@ -35,6 +35,14 @@ func _layout_overlay_for_size(viewport_size: Vector2) -> void:
 	var safe_bottom: float = float(insets.get("bottom", 0.0))
 	var safe_left: float = float(insets.get("left", 0.0))
 	var safe_right: float = float(insets.get("right", 0.0))
+	var horizontal_insets: float = safe_left + safe_right
+	var vertical_insets: float = safe_top + safe_bottom
+	if horizontal_insets > viewport_size.x * 0.25:
+		safe_left = 0.0
+		safe_right = 0.0
+	if vertical_insets > viewport_size.y * 0.25:
+		safe_top = 0.0
+		safe_bottom = 0.0
 	var viewport_aspect: float = viewport_size.x / max(1.0, viewport_size.y)
 	var is_wide: bool = viewport_aspect >= 1.55
 

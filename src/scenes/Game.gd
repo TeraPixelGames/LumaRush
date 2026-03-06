@@ -39,7 +39,6 @@ var _powerup_usage := {"undo": 0, "prism": 0, "hint": 0}
 var _run_powerups_used_total: int = 0
 var _run_coins_spent: int = 0
 var _open_tip_shown_this_run: bool = false
-var _pause_overlap_factor: float = 0.5
 var _audio_overlay
 var _current_mode: String = "PURE"
 var _pure_mode_locked: bool = false
@@ -784,7 +783,6 @@ func _layout_top_bar(view_size: Vector2, content_left: float, content_width: flo
 		pause_button.custom_minimum_size = Vector2(pause_size, pause_size)
 		pause_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		pause_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-		_pause_overlap_factor = _pause_overlap_factor_for_viewport(view_size)
 		_queue_pause_button_overlap_position()
 
 func _layout_top_right(view_size: Vector2) -> void:
@@ -843,13 +841,7 @@ func _position_pause_button_overlap() -> void:
 	if pause_button.size.y <= 0.0:
 		return
 	var centered_y: float = floor((top_bar.size.y - pause_button.size.y) * 0.5)
-	pause_button.position.y = centered_y - (pause_button.size.y * _pause_overlap_factor)
-
-func _pause_overlap_factor_for_viewport(view_size: Vector2) -> float:
-	if view_size.y <= 0.0:
-		return 0.5
-	var aspect: float = view_size.x / view_size.y
-	return 0.42 if aspect < 0.9 else 0.5
+	pause_button.position.y = centered_y
 
 func _queue_pause_button_overlap_position() -> void:
 	call_deferred("_queue_pause_button_overlap_position_deferred")

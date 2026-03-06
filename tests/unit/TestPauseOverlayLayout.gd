@@ -34,6 +34,10 @@ func test_pause_overlay_scales_for_wide_short_viewports() -> void:
 		_assert_rect_inside(panel_rect, viewport_rect)
 		_assert_rect_inside(resume_rect, panel_rect)
 		_assert_rect_inside(quit_rect, panel_rect)
+		var expected_center: Vector2 = viewport_rect.get_center()
+		var panel_center: Vector2 = panel_rect.get_center()
+		assert_that(abs(panel_center.x - expected_center.x)).is_less_equal(2.0)
+		assert_that(abs(panel_center.y - expected_center.y)).is_less_equal(2.0)
 		var viewport_aspect: float = viewport_rect.size.x / max(viewport_rect.size.y, 1.0)
 		var max_panel_ratio: float = 0.52 if viewport_aspect >= 1.55 else 0.76
 		assert_that(panel_rect.size.x).is_less_equal((viewport_rect.size.x * max_panel_ratio) + 0.1)

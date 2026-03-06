@@ -11,10 +11,12 @@ func test_gameplay_layout_stays_inside_wide_short_viewports() -> void:
 
 	var board: BoardView = game.get_node_or_null("BoardView") as BoardView
 	var top_bar: Control = game.get_node_or_null("UI/TopBar") as Control
+	var pause_button: Control = game.get_node_or_null("UI/TopBar/Pause") as Control
 	var powerups_row: Control = game.get_node_or_null("UI/Powerups") as Control
 	var undo_button: Control = game.get_node_or_null("UI/Powerups/Undo") as Control
 	assert_that(board).is_not_null()
 	assert_that(top_bar).is_not_null()
+	assert_that(pause_button).is_not_null()
 	assert_that(powerups_row).is_not_null()
 	assert_that(undo_button).is_not_null()
 
@@ -32,6 +34,7 @@ func test_gameplay_layout_stays_inside_wide_short_viewports() -> void:
 		await get_tree().process_frame
 		var viewport_rect := Rect2(Vector2.ZERO, game.get_viewport_rect().size)
 		var top_rect: Rect2 = top_bar.get_global_rect()
+		var pause_rect: Rect2 = pause_button.get_global_rect()
 		var powerups_rect: Rect2 = powerups_row.get_global_rect()
 		var undo_rect: Rect2 = undo_button.get_global_rect()
 		var board_rect := Rect2(
@@ -39,8 +42,12 @@ func test_gameplay_layout_stays_inside_wide_short_viewports() -> void:
 			Vector2(float(board.width) * board.tile_size, float(board.height) * board.tile_size)
 		)
 		_assert_rect_inside(top_rect, viewport_rect)
+		_assert_rect_inside(pause_rect, top_rect)
 		_assert_rect_inside(powerups_rect, viewport_rect)
 		_assert_rect_inside(undo_rect, viewport_rect)
+		var expected_pause_center_y: float = top_rect.position.y + (top_rect.size.y * 0.5)
+		var pause_center_y: float = pause_rect.position.y + (pause_rect.size.y * 0.5)
+		assert_that(abs(pause_center_y - expected_pause_center_y)).is_less_equal(2.0)
 		assert_that(board_rect.position.x).is_greater_equal(0.0)
 		assert_that(board_rect.position.x + board_rect.size.x).is_less_equal(viewport_rect.size.x + 1.0)
 		assert_that(board_rect.position.y).is_greater_equal(top_rect.position.y + top_rect.size.y - 1.0)

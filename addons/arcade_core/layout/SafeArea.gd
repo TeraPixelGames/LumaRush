@@ -29,7 +29,23 @@ func _safe_rect_for_viewport(viewport_size: Vector2) -> Rect2:
     var raw_rect: Rect2i = DisplayServer.get_display_safe_area()
     if raw_rect.size.x <= 0 or raw_rect.size.y <= 0:
         return Rect2(Vector2.ZERO, viewport_size)
-    return Rect2(raw_rect.position, raw_rect.size)
+    var direct_rect := Rect2(raw_rect.position, raw_rect.size)
+    var window_size: Vector2i = DisplayServer.window_get_size()
+    if window_size.x <= 0 or window_size.y <= 0:
+        return direct_rect
+
+    # Depending on platform/stretch mode, DisplayServer can return safe-area values
+    # in either window pixels or viewport units. Compare both interpretations and
+    # keep the one that preserves the larger visible safe area.
+    var scale := Vector2(
+        viewport_size.x / float(window_size.x),
+        viewport_size.y / float(window_size.y)
+    )
+    var scaled_rect := Rect2(Vector2(raw_rect.position) * scale, Vector2(raw_rect.size) * scale)
+    var viewport_rect := Rect2(Vector2.ZERO, viewport_size)
+    var direct_area: float = direct_rect.intersection(viewport_rect).get_area()
+    var scaled_area: float = scaled_rect.intersection(viewport_rect).get_area()
+    return scaled_rect if scaled_area > direct_area else direct_rect
 
 static func compute_insets(viewport_size: Vector2, safe_rect: Rect2) -> Dictionary:
     var full_rect := Rect2(Vector2.ZERO, viewport_size)
